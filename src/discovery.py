@@ -38,7 +38,8 @@ def discover_candidates() -> list[str]:
         except Exception as e:
             print(f"  [discovery] screener '{screener_name}' failed: {e}")
 
-    # 3. Cap and sort
+    # 3. Remove avoided tickers, cap and sort
+    tickers -= config.AVOID_LIST
     result_list = sorted(tickers)[:config.MAX_TICKERS]
 
     cache.set(cache_key, result_list)

@@ -25,7 +25,6 @@ CURATED_WATCHLIST = {
     "MSFT":  ("US",        "Azure AI + Copilot"),
     "AMZN":  ("US",        "AWS + AI cloud"),
     "AVGO":  ("US",        "Networking + AI chips"),
-    "PLTR":  ("US",        "Zero debt, AI gov contracts"),
     "ISRG":  ("US",        "Surgical robotics monopoly"),
     "MU":    ("US",        "AI memory chips HBM3E"),
     "ARM":   ("US",        "CPU architecture licensor"),
@@ -35,7 +34,13 @@ CURATED_WATCHLIST = {
     "ASML":  ("EU",        "EUV lithography monopoly"),
     "SAP":   ("EU",        "Enterprise AI software"),
     "SE":    ("Singapore", "SE Asia super-app"),
-    "GRAB":  ("Singapore", "SE Asia fintech/ride-hail"),
+}
+
+# ── Avoid List ────────────────────────────────────────
+# Tickers added here are excluded from all analysis, reports, and discovery.
+AVOID_LIST = {
+    "PLTR",   # user preference
+    "GRAB",   # user preference
 }
 
 # ── Risk Weights (must sum to 1.0) ───────────────────

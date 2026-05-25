@@ -8,17 +8,19 @@ Refreshes live data and generates a full Markdown report.
 import yfinance as yf
 from datetime import datetime
 import os
+import sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import config
 
 # ─────────────────────────────────────────────
 # WATCHLIST — edit freely to add/remove tickers
 # ─────────────────────────────────────────────
-WATCHLIST = {
+_WATCHLIST_ALL = {
     # Ticker : (Region, Shariah, Notes)
     "NVDA":    ("🇺🇸 US",        "⚠️ Partial", "AI infrastructure king"),
     "MSFT":    ("🇺🇸 US",        "⚠️ Partial", "Azure AI + Copilot"),
     "AMZN":    ("🇺🇸 US",        "⚠️ Partial", "AWS + AI cloud"),
     "AVGO":    ("🇺🇸 US",        "❌ No",       "VMware debt too high"),
-    "PLTR":    ("🇺🇸 US",        "✅ Yes",      "Zero debt, AI gov contracts"),
     "ISRG":    ("🇺🇸 US",        "✅ Yes",      "Surgical robotics monopoly"),
     "MU":      ("🇺🇸 US",        "✅ Yes",      "AI memory chips HBM3E"),
     "ARM":     ("🇺🇸 US",        "⚠️ Partial", "High beta 4.1x — volatile"),
@@ -28,16 +30,17 @@ WATCHLIST = {
     "ASML":    ("🇪🇺 EU",        "✅ Yes",      "EUV lithography monopoly"),
     "SAP":     ("🇪🇺 EU",        "✅ Yes",      "Enterprise AI software"),
     "SE":      ("🇸🇬 Singapore", "⚠️ Partial", "SE Asia super-app"),
-    "GRAB":    ("🇸🇬 Singapore", "⚠️ Partial", "SE Asia fintech/ride-hail"),
 }
+WATCHLIST = {t: v for t, v in _WATCHLIST_ALL.items() if t not in config.AVOID_LIST}
 
 # Baseline prices from March 18, 2026 (update after each refresh if desired)
-BASELINE = {
+_BASELINE_ALL = {
     "NVDA": 181.93, "MSFT": 399.41, "AMZN": 215.20, "AVGO": 321.31,
-    "PLTR": 155.08, "ISRG": 482.76, "MU": 461.69,   "ARM":  127.31,
+    "ISRG": 482.76, "MU": 461.69,   "ARM":  127.31,
     "BABA": 136.57, "BIDU": 120.69, "TSM": 345.98,  "ASML": 1389.16,
-    "SAP":  190.12, "SE":   87.59,  "GRAB": 3.84,
+    "SAP":  190.12, "SE":   87.59,
 }
+BASELINE = {t: v for t, v in _BASELINE_ALL.items() if t not in config.AVOID_LIST}
 
 SHARIAH_COMPLIANT_ONLY = False   # Set True to filter table to Shariah stocks only
 OUTPUT_FILE = "report.md"        # Set None to print only, or a filename to save
