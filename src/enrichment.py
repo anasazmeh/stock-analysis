@@ -35,15 +35,20 @@ def _fetch_one(ticker: str) -> Opportunity:
         print(f"  [enrich] {ticker} ERROR: {e}")
         return Opportunity(ticker=ticker)
 
-    price  = info.get("currentPrice") or info.get("regularMarketPrice") or 0
-    target = info.get("targetMeanPrice") or 0
+    price    = info.get("currentPrice") or info.get("regularMarketPrice") or 0
+    target   = info.get("targetMeanPrice") or 0
+    currency = (info.get("currency") or "USD").upper()
+    country  = info.get("country", "N/A") or "N/A"
+    region   = config.REGION_MAP.get(country, "🌐 Other")
 
     opp = Opportunity(
         ticker=ticker,
         name=str(info.get("shortName", ticker))[:32],
         sector=info.get("sector", "N/A") or "N/A",
         industry=info.get("industry", "N/A") or "N/A",
-        country=info.get("country", "N/A") or "N/A",
+        country=country,
+        currency=currency,
+        region=region,
         price=_safe_float(price),
         target=_safe_float(target),
         upside=round((target / price - 1) * 100, 1) if price and target else None,

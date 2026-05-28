@@ -16,12 +16,25 @@ from src.models import Opportunity, MacroContext
 _GNEWS_URL = "https://news.google.com/rss/search?q={query}&hl=en&gl=US&ceid=US:en"
 
 MACRO_QUERIES = [
+    # Global macro
     "global stock market today",
     "Federal Reserve interest rate policy",
     "AI technology sector stocks",
     "semiconductor supply chain",
     "geopolitical risk financial markets",
     "emerging markets investment outlook",
+    # Europe
+    "European stock market ECB interest rates 2026",
+    "Europe tech pharma earnings outlook",
+    # Asia
+    "Asia stock market China India Japan Korea 2026",
+    "TSMC Samsung AI chip demand earnings",
+    "India stock market Nifty Sensex outlook",
+    "Japan Bank of Japan monetary policy stocks",
+    # Middle East
+    "Saudi Arabia Tadawul TASI stock market 2026",
+    "Vision 2030 Saudi Arabia investment opportunities",
+    "UAE Abu Dhabi stock market ADX outlook",
 ]
 
 

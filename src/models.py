@@ -46,6 +46,8 @@ class Opportunity:
     sector: str = "N/A"
     industry: str = "N/A"
     country: str = "N/A"
+    currency: str = "USD"   # ISO currency code from yfinance
+    region: str = "US"      # display region from REGION_MAP
     # Price data
     price: float = 0.0
     target: float = 0.0

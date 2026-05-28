@@ -21,19 +21,58 @@ MAX_TICKERS = 50
 
 CURATED_WATCHLIST = {
     # Ticker : (Region, Notes)
-    "NVDA":  ("US",        "AI infrastructure king"),
-    "MSFT":  ("US",        "Azure AI + Copilot"),
-    "AMZN":  ("US",        "AWS + AI cloud"),
-    "AVGO":  ("US",        "Networking + AI chips"),
-    "ISRG":  ("US",        "Surgical robotics monopoly"),
-    "MU":    ("US",        "AI memory chips HBM3E"),
-    "ARM":   ("US",        "CPU architecture licensor"),
-    "BABA":  ("China",     "Cheapest mega-cap globally"),
-    "BIDU":  ("China",     "AI + autonomous vehicles"),
-    "TSM":   ("Taiwan",    "AI chip monopoly"),
-    "ASML":  ("EU",        "EUV lithography monopoly"),
-    "SAP":   ("EU",        "Enterprise AI software"),
-    "SE":    ("Singapore", "SE Asia super-app"),
+
+    # ── US ────────────────────────────────────────────────────────────────
+    "NVDA":  ("US",          "AI infrastructure king"),
+    "MSFT":  ("US",          "Azure AI + Copilot"),
+    "AMZN":  ("US",          "AWS + AI cloud"),
+    "AVGO":  ("US",          "Networking + AI chips"),
+    "ISRG":  ("US",          "Surgical robotics monopoly"),
+    "MU":    ("US",          "AI memory chips HBM3E"),
+    "ARM":   ("US",          "CPU architecture licensor"),
+    "META":  ("US",          "Social AI + ad platform"),
+    "LLY":   ("US",          "GLP-1 obesity drugs leader"),
+    "JPM":   ("US",          "Diversified banking — AI capital markets"),
+    "CRWD":  ("US",          "AI-native cybersecurity platform"),
+
+    # ── Europe (US ADR) ───────────────────────────────────────────────────
+    "ASML":  ("Netherlands", "EUV lithography monopoly"),
+    "SAP":   ("Germany",     "Enterprise AI software"),
+    "AZN":   ("UK",          "Pharma — rich oncology pipeline"),
+    "NVO":   ("Denmark",     "Ozempic/Wegovy GLP-1 leader"),
+    "ARGX":  ("Belgium",     "Biotech — autoimmune disease"),
+
+    # ── Europe (local exchanges) ──────────────────────────────────────────
+    "MC.PA":  ("France",    "Luxury conglomerate — LVMH"),
+    "RMS.PA": ("France",    "Ultra-luxury — Hermès"),
+    "SU.PA":  ("France",    "Energy automation — Schneider Electric"),
+    "ENR.DE": ("Germany",   "Clean energy transition — Siemens Energy"),
+
+    # ── Asia (US ADR) ─────────────────────────────────────────────────────
+    "TSM":   ("Taiwan",      "AI chip fab monopoly"),
+    "BABA":  ("China",       "E-commerce + Alibaba Cloud AI"),
+    "BIDU":  ("China",       "AI + autonomous vehicles"),
+    "SE":    ("Singapore",   "SE Asia super-app"),
+    "INFY":  ("India",       "IT services — AI transformation"),
+
+    # ── Asia (local exchanges) ────────────────────────────────────────────
+    "700.HK":      ("Hong Kong",  "Tencent — tech/gaming/fintech"),
+    "005930.KS":   ("Korea",      "Samsung — memory/mobile/AI"),
+    "066570.KS":   ("Korea",      "LG Electronics — EV parts/appliances"),
+    "RELIANCE.NS": ("India",      "Conglomerate — Jio + Retail + Green H2"),
+    "HDFCBANK.NS": ("India",      "India's largest private bank"),
+    "6503.T":      ("Japan",      "Mitsubishi Electric — AI factory automation"),
+    "9984.T":      ("Japan",      "SoftBank — AI/Vision Fund"),
+
+    # ── Middle East — Saudi Tadawul (.SR) ─────────────────────────────────
+    "7203.SR": ("Saudi Arabia", "Elm — digital gov IT monopoly"),
+    "4013.SR": ("Saudi Arabia", "Dr. Sulaiman Al-Habib — healthcare"),
+    "1120.SR": ("Saudi Arabia", "Al Rajhi Bank — Islamic banking"),
+    "2222.SR": ("Saudi Arabia", "Saudi Aramco — energy + dividend"),
+    "1211.SR": ("Saudi Arabia", "Ma'aden — mining + materials"),
+    "2082.SR": ("Saudi Arabia", "ACWA Power — renewables"),
+    "2010.SR": ("Saudi Arabia", "SABIC — petrochemicals"),
+    "7010.SR": ("Saudi Arabia", "STC — telecom + STC Pay fintech"),
 }
 
 # ── Avoid List ────────────────────────────────────────
@@ -87,17 +126,77 @@ ENRICH_WORKERS = 5    # ThreadPoolExecutor max_workers
 
 # ── Geopolitical exposure by country ─────────────────
 GEO_EXPOSURE = {
-    "China":     "High",
-    "Taiwan":    "High",
-    "Russia":    "High",
-    "Iran":      "High",
-    "US":        "Low",
-    "EU":        "Low",
-    "Germany":   "Low",
-    "Japan":     "Low",
-    "Singapore": "Medium",
-    "India":     "Medium",
-    "Korea":     "Medium",
+    # Low risk
+    "US":           "Low",
+    "Germany":      "Low",
+    "Netherlands":  "Low",
+    "France":       "Low",
+    "UK":           "Low",
+    "Denmark":      "Low",
+    "Belgium":      "Low",
+    "Switzerland":  "Low",
+    "Sweden":       "Low",
+    "Japan":        "Low",
+    "Australia":    "Low",
+    "UAE":          "Low",
+    # Medium risk
+    "Singapore":    "Medium",
+    "India":        "Medium",
+    "Korea":        "Medium",
+    "Saudi Arabia": "Medium",
+    "Brazil":       "Medium",
+    "Mexico":       "Medium",
+    # High risk
+    "China":        "High",
+    "Taiwan":       "High",
+    "Hong Kong":    "High",
+    "Russia":       "High",
+    "Iran":         "High",
+    "Israel":       "High",
+}
+
+# ── Region map — company home country → display region ───────────────
+REGION_MAP = {
+    # US
+    "US":           "🇺🇸 US",
+    # Europe
+    "Germany":      "🇪🇺 Europe",
+    "Netherlands":  "🇪🇺 Europe",
+    "France":       "🇪🇺 Europe",
+    "UK":           "🇪🇺 Europe",
+    "Denmark":      "🇪🇺 Europe",
+    "Belgium":      "🇪🇺 Europe",
+    "Switzerland":  "🇪🇺 Europe",
+    "Sweden":       "🇪🇺 Europe",
+    # Asia
+    "China":        "🌏 Asia",
+    "Taiwan":       "🌏 Asia",
+    "Hong Kong":    "🌏 Asia",
+    "Japan":        "🌏 Asia",
+    "Korea":        "🌏 Asia",
+    "India":        "🌏 Asia",
+    "Singapore":    "🌏 Asia",
+    "Australia":    "🌏 Asia",
+    # Middle East
+    "Saudi Arabia": "🌙 Middle East",
+    "UAE":          "🌙 Middle East",
+    "Israel":       "🌙 Middle East",
+}
+
+# ── Currency symbols by ISO code ──────────────────────
+CURRENCY_SYMBOLS = {
+    "USD": "$",
+    "EUR": "€",
+    "GBP": "£",
+    "HKD": "HK$",
+    "KRW": "₩",
+    "JPY": "¥",
+    "INR": "₹",
+    "SAR": "SAR ",
+    "AED": "AED ",
+    "CNY": "¥",
+    "SGD": "S$",
+    "TWD": "NT$",
 }
 
 # ── Sanity checks ─────────────────────────────────────

@@ -30,10 +30,23 @@ def _shariah_badge(compliant: str) -> str:
     return {"Yes": "✅ Yes", "No": "❌ No", "Partial": "⚠️ Partial"}.get(compliant, "❓ Unknown")
 
 
-def _mcap_str(v: float) -> str:
-    if v >= 1e12: return f"${v/1e12:.2f}T"
-    if v >= 1e9:  return f"${v/1e9:.1f}B"
-    if v > 0:     return f"${v/1e6:.0f}M"
+def _currency_sym(currency: str) -> str:
+    return config.CURRENCY_SYMBOLS.get(currency.upper(), currency + " ")
+
+
+def _fmt_price(price: float, currency: str) -> str:
+    sym = _currency_sym(currency)
+    # KRW and JPY are large integers — no decimal places
+    if currency.upper() in ("KRW", "JPY", "IDR"):
+        return f"{sym}{price:,.0f}"
+    return f"{sym}{price:,.2f}"
+
+
+def _mcap_str(v: float, currency: str = "USD") -> str:
+    sym = _currency_sym(currency)
+    if v >= 1e12: return f"{sym}{v/1e12:.2f}T"
+    if v >= 1e9:  return f"{sym}{v/1e9:.1f}B"
+    if v > 0:     return f"{sym}{v/1e6:.0f}M"
     return "N/A"
 
 
@@ -152,8 +165,11 @@ def generate_report(opportunities: list[Opportunity], macro: MacroContext) -> st
         lines.append("")
         lines.append(f"| Field | Value |")
         lines.append(f"|-------|-------|")
-        lines.append(f"| **Price / Target / Upside** | ${opp.price:,.2f} / ${opp.target:,.2f} / {_upside_emoji(opp.upside)} |")
-        lines.append(f"| **Market Cap** | {_mcap_str(opp.mcap)} |")
+        price_str  = _fmt_price(opp.price, opp.currency)
+        target_str = _fmt_price(opp.target, opp.currency) if opp.target else "N/A"
+        lines.append(f"| **Region / Country** | {opp.region} — {opp.country} |")
+        lines.append(f"| **Price / Target / Upside** | {price_str} / {target_str} / {_upside_emoji(opp.upside)} |")
+        lines.append(f"| **Market Cap** | {_mcap_str(opp.mcap, opp.currency)} |")
         lines.append(f"| **Sector** | {opp.sector} — {opp.industry} |")
         lines.append(f"| **Analyst Recommendation** | {_rec_fmt(opp.rec)} |")
 
@@ -193,7 +209,7 @@ def generate_report(opportunities: list[Opportunity], macro: MacroContext) -> st
         for i, opp in enumerate(shariah_picks, 1):
             risk_score = opp.risk.composite_score if opp.risk else 5.0
             lines.append(
-                f"| {i} | **{opp.ticker}** | {opp.name} | ${opp.price:,.2f} | "
+                f"| {i} | **{opp.ticker}** | {opp.name} | {_fmt_price(opp.price, opp.currency)} | "
                 f"{_upside_emoji(opp.upside)} | {risk_score:.1f}/10 | "
                 f"{opp.de or 'N/A'} | {opp.fpe or 'N/A'}x | "
                 f"{opp.shariah.reasons[0][:60] if opp.shariah and opp.shariah.reasons else 'Compliant'} |"
@@ -205,16 +221,16 @@ def generate_report(opportunities: list[Opportunity], macro: MacroContext) -> st
     # ── Full Watchlist Table ──────────────────────────────────────────────
     lines += [f"## 📋 Full Screened Universe ({len(ranked)} stocks)", ""]
     lines += [
-        "| # | Ticker | Company | Price | Target | Upside | Risk | Shariah | Rec | Sector |",
-        "|---|--------|---------|------:|-------:|:------:|:----:|:-------:|-----|--------|",
+        "| # | Ticker | Company | Price | Target | Upside | Risk | Shariah | Rec | Region | Sector |",
+        "|---|--------|---------|------:|-------:|:------:|:----:|:-------:|-----|--------|--------|",
     ]
     for i, opp in enumerate(ranked, 1):
         risk_score = opp.risk.composite_score if opp.risk else 5.0
         shariah_status = _shariah_badge(opp.shariah.compliant) if opp.shariah else "❓"
         lines.append(
-            f"| {i} | **{opp.ticker}** | {opp.name} | ${opp.price:,.2f} | "
-            f"${opp.target:,.2f} | {_upside_emoji(opp.upside)} | "
-            f"{risk_score:.1f} | {shariah_status} | {_rec_fmt(opp.rec)} | {opp.sector} |"
+            f"| {i} | **{opp.ticker}** | {opp.name} | {_fmt_price(opp.price, opp.currency)} | "
+            f"{_fmt_price(opp.target, opp.currency) if opp.target else 'N/A'} | {_upside_emoji(opp.upside)} | "
+            f"{risk_score:.1f} | {shariah_status} | {_rec_fmt(opp.rec)} | {opp.region} | {opp.sector} |"
         )
     lines += ["", "---", ""]
 
@@ -264,13 +280,45 @@ def generate_report(opportunities: list[Opportunity], macro: MacroContext) -> st
         )
     lines += ["", "---", ""]
 
+    # ── Regional Breakdown ───────────────────────────────────────────────
+    region_data: dict = {}
+    for opp in ranked:
+        r = opp.region or "🌐 Other"
+        region_data.setdefault(r, {"tickers": [], "upsides": [], "risks": [], "shariah_yes": 0})
+        region_data[r]["tickers"].append(opp.ticker)
+        if opp.upside is not None:
+            region_data[r]["upsides"].append(opp.upside)
+        if opp.risk:
+            region_data[r]["risks"].append(opp.risk.composite_score)
+        if opp.shariah and opp.shariah.compliant == "Yes":
+            region_data[r]["shariah_yes"] += 1
+
+    lines += ["## 🌍 Regional Breakdown", ""]
+    lines += [
+        "| Region | Stocks | Avg Upside | Avg Risk | Shariah ✅ | Top Pick |",
+        "|--------|:------:|:----------:|:--------:|:---------:|---------|",
+    ]
+    for region, d in sorted(region_data.items()):
+        avg_up   = round(sum(d["upsides"]) / len(d["upsides"]), 1) if d["upsides"] else None
+        avg_risk = round(sum(d["risks"])   / len(d["risks"]),   1) if d["risks"]   else None
+        up_str   = f"+{avg_up}%" if avg_up is not None and avg_up >= 0 else (f"{avg_up}%" if avg_up is not None else "N/A")
+        # Top pick = ticker with highest upside in this region
+        region_opps = [o for o in ranked if o.region == region]
+        top = max(region_opps, key=lambda o: o.upside or -999, default=None)
+        top_str = f"{top.ticker} ({_upside_emoji(top.upside)})" if top else "N/A"
+        lines.append(
+            f"| {region} | {len(d['tickers'])} | {up_str} | "
+            f"{avg_risk or 'N/A'} | {d['shariah_yes']}/{len(d['tickers'])} | {top_str} |"
+        )
+    lines += ["", "---", ""]
+
     # ── Methodology ──────────────────────────────────────────────────────
     lines += [
         "## 📖 Methodology",
         "",
-        "- **Discovery**: yfinance screeners (`undervalued_growth_stocks`, `growth_technology_stocks`, `aggressive_small_caps`, `most_actives`) + curated watchlist",
-        "- **Fundamentals**: Yahoo Finance via yfinance (price, target, P/E, growth, beta, margins, D/E)",
-        "- **News**: Yahoo Finance ticker news + Google News RSS (macro queries)",
+        "- **Discovery**: yfinance screeners (`undervalued_growth_stocks`, `growth_technology_stocks`, `aggressive_small_caps`, `most_actives`) + curated watchlist covering US / Europe / Asia / Middle East",
+        "- **Fundamentals**: Yahoo Finance via yfinance — supports NYSE, NASDAQ, LSE, Euronext, TSE, KRX, NSE, HKEX, Tadawul (`.SR`) and more. Prices shown in local currency.",
+        "- **News**: Yahoo Finance ticker news + Google News RSS (global + regional macro queries for US, Europe, Asia, Middle East)",
         "- **AI Analysis**: Claude API (`claude-sonnet-4-6`) — investment thesis, sentiment, catalysts per ticker; macro regime synthesis",
         "- **Risk**: Beta, 30d annualized volatility, 6mo max drawdown, D/E, RSI(14), geopolitical exposure",
         "- **Shariah**: AAOIFI-standard screening — business activity deny-list + financial ratios (debt/cash/receivables < 33% of market cap, interest income < 5% of revenue)",
