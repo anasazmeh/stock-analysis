@@ -1,9 +1,11 @@
 import os
 
 # ── API Keys ──────────────────────────────────────────
-ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
-FINNHUB_API_KEY   = os.environ.get("FINNHUB_API_KEY", "")
-FRED_API_KEY      = os.environ.get("FRED_API_KEY", "")
+ANTHROPIC_API_KEY     = os.environ.get("ANTHROPIC_API_KEY", "")
+FINNHUB_API_KEY       = os.environ.get("FINNHUB_API_KEY", "")
+FRED_API_KEY          = os.environ.get("FRED_API_KEY", "")
+ALPHA_VANTAGE_API_KEY = os.environ.get("ALPHA_VANTAGE_API_KEY", "")  # free at alphavantage.co
+ARGAAM_API_KEY        = os.environ.get("ARGAAM_API_KEY", "")          # Argaam Saudi data
 
 # ── Claude ────────────────────────────────────────────
 CLAUDE_MODEL = "claude-sonnet-4-6"
@@ -115,11 +117,13 @@ REPORT_DIR = str(_BASE / "reports")
 CACHE_DIR  = str(_BASE / "data" / "cache")
 
 # ── Cache TTLs (seconds) ──────────────────────────────
-TTL_SCREENER   = 12 * 3600
-TTL_FUNDAMENTALS = 6 * 3600
-TTL_NEWS       = 4 * 3600
-TTL_FRED       = 24 * 3600
-TTL_AI         = 12 * 3600
+TTL_SCREENER     = 12 * 3600
+TTL_FUNDAMENTALS = 6  * 3600
+TTL_NEWS         = 4  * 3600
+TTL_FRED         = 24 * 3600
+TTL_AI           = 12 * 3600
+TTL_EARNINGS     = 24 * 3600
+TTL_INSIDER      = 6  * 3600
 
 # ── Enrichment ────────────────────────────────────────
 ENRICH_WORKERS = 5    # ThreadPoolExecutor max_workers

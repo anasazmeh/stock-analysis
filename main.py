@@ -18,6 +18,9 @@ from datetime import datetime
 import config
 from src.discovery import discover_candidates
 from src.enrichment import enrich_tickers
+from src.alphavantage import enrich_missing_targets, fetch_earnings_dates, fetch_earnings_surprises
+from src.argaam import enrich_saudi_targets
+from src.insider import fetch_insider_trades
 from src.news import attach_news, build_macro_context
 from src.intelligence import analyze_tickers, build_macro_analysis
 from src.risk import compute_risk
@@ -46,6 +49,32 @@ def main():
     opportunities = enrich_tickers(tickers)
     valid = [o for o in opportunities if o.price > 0]
     print(f"   → {len(valid)} tickers with valid data\n")
+
+    # ── Stage 2a: Alpha Vantage — fill missing targets + earnings data ───
+    if config.ALPHA_VANTAGE_API_KEY:
+        print("📈 Stage 2a: Alpha Vantage enrichment...")
+        opportunities = enrich_missing_targets(opportunities)
+        opportunities = fetch_earnings_dates(opportunities)
+        opportunities = fetch_earnings_surprises(opportunities)
+        av_count = sum(1 for o in opportunities if o.earnings_date)
+        print(f"   → {av_count} earnings dates fetched\n")
+    else:
+        print("📈 Stage 2a: Alpha Vantage skipped (no API key)\n")
+
+    # ── Stage 2b: Argaam — Saudi (.SR) analyst targets ───────────────────
+    print("🌙 Stage 2b: Argaam Saudi enrichment...")
+    opportunities = enrich_saudi_targets(opportunities)
+    saudi_enriched = sum(
+        1 for o in opportunities if o.ticker.endswith(".SR") and o.target > 0
+    )
+    print(f"   → {saudi_enriched} Saudi tickers with targets\n")
+
+    # ── Stage 2c: SEC EDGAR — insider trading signals ────────────────────
+    print("🏛️  Stage 2c: SEC EDGAR insider trades...")
+    opportunities = fetch_insider_trades(opportunities)
+    bullish = sum(1 for o in opportunities if o.insider_signal == "Bullish")
+    bearish = sum(1 for o in opportunities if o.insider_signal == "Bearish")
+    print(f"   → {bullish} bullish, {bearish} bearish insider signals\n")
 
     # ── Stage 3: News ────────────────────────────────────────────────────
     print("📰 Stage 3: Gathering news & macro data...")

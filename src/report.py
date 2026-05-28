@@ -194,6 +194,28 @@ def generate_report(opportunities: list[Opportunity], macro: MacroContext) -> st
             if opp.shariah.reasons:
                 lines.append(f"| **Shariah Notes** | {opp.shariah.reasons[0] if opp.shariah.reasons else ''} |")
 
+        # Alpha Vantage: earnings date + EPS surprise
+        if opp.earnings_date:
+            from datetime import date
+            try:
+                days_to = (date.fromisoformat(opp.earnings_date) - date.today()).days
+                flag = " 🔔 (within 60d)" if days_to <= 60 else ""
+                lines.append(f"| **Next Earnings** | {opp.earnings_date}{flag} |")
+            except ValueError:
+                lines.append(f"| **Next Earnings** | {opp.earnings_date} |")
+        if opp.eps_surprise is not None:
+            emoji = "📈" if opp.eps_surprise > 0 else ("📉" if opp.eps_surprise < 0 else "➡️")
+            lines.append(f"| **EPS Surprise (last Q)** | {emoji} {opp.eps_surprise:+.1f}% |")
+
+        # SEC EDGAR insider signal
+        if opp.insider_signal != "Neutral":
+            sig_emoji = "🟢" if opp.insider_signal == "Bullish" else "🔴"
+            direction = "buying" if opp.insider_net_shares > 0 else "selling"
+            lines.append(
+                f"| **Insider Activity** | {sig_emoji} {opp.insider_signal} — "
+                f"insiders net {direction} {abs(opp.insider_net_shares):,} shares (30d) |"
+            )
+
         lines.append(f"| **Rank Score** | {opp.rank_score:.1f}/100 |")
         lines.append("")
 
@@ -241,13 +263,21 @@ def generate_report(opportunities: list[Opportunity], macro: MacroContext) -> st
         if opp.upside and opp.upside >= 60:
             alerts.append(f"- 🟢 **{opp.ticker}** — Analyst upside **+{opp.upside:.1f}%** — Strong opportunity")
         if opp.price and opp.w52_low and opp.price < opp.w52_low * 1.05:
-            alerts.append(f"- 🔵 **{opp.ticker}** — Within 5% of 52-week low (${opp.w52_low:,.2f}) — potential bottom")
+            alerts.append(f"- 🔵 **{opp.ticker}** — Within 5% of 52-week low ({_fmt_price(opp.w52_low, opp.currency)}) — potential bottom")
         if opp.beta and opp.beta > 3:
             alerts.append(f"- 🟡 **{opp.ticker}** — Very high beta ({opp.beta:.1f}x) — extreme volatility")
         if opp.upside is not None and opp.upside < 0:
             alerts.append(f"- 🔴 **{opp.ticker}** — Trading **above analyst target** ({opp.upside:.1f}%) — caution")
         if opp.risk and opp.risk.rsi_14 > 75:
             alerts.append(f"- 🟡 **{opp.ticker}** — RSI {opp.risk.rsi_14:.0f} — overbought territory")
+        if opp.insider_signal == "Bullish":
+            alerts.append(f"- 🟢 **{opp.ticker}** — Insider BUYING signal — net +{opp.insider_net_shares:,} shares (30d)")
+        if opp.insider_signal == "Bearish":
+            alerts.append(f"- 🔴 **{opp.ticker}** — Insider SELLING signal — net {opp.insider_net_shares:,} shares (30d)")
+        if opp.eps_surprise is not None and opp.eps_surprise >= 20:
+            alerts.append(f"- 📈 **{opp.ticker}** — EPS beat by **+{opp.eps_surprise:.1f}%** last quarter")
+        if opp.eps_surprise is not None and opp.eps_surprise <= -10:
+            alerts.append(f"- 📉 **{opp.ticker}** — EPS miss by **{opp.eps_surprise:.1f}%** last quarter")
     if alerts:
         lines += alerts
     else:
@@ -318,6 +348,9 @@ def generate_report(opportunities: list[Opportunity], macro: MacroContext) -> st
         "",
         "- **Discovery**: yfinance screeners (`undervalued_growth_stocks`, `growth_technology_stocks`, `aggressive_small_caps`, `most_actives`) + curated watchlist covering US / Europe / Asia / Middle East",
         "- **Fundamentals**: Yahoo Finance via yfinance — supports NYSE, NASDAQ, LSE, Euronext, TSE, KRX, NSE, HKEX, Tadawul (`.SR`) and more. Prices shown in local currency.",
+        "- **Alpha Vantage**: Fills missing analyst price targets, next earnings dates, and last-quarter EPS surprise % for US tickers (free tier).",
+        "- **Argaam**: Saudi-specific analyst consensus targets for Tadawul (`.SR`) tickers where yfinance has no coverage.",
+        "- **SEC EDGAR Form 4**: 30-day insider buying/selling activity for US-listed stocks — classified as Bullish / Bearish / Neutral based on net share transactions.",
         "- **News**: Yahoo Finance ticker news + Google News RSS (global + regional macro queries for US, Europe, Asia, Middle East)",
         "- **AI Analysis**: Claude API (`claude-sonnet-4-6`) — investment thesis, sentiment, catalysts per ticker; macro regime synthesis",
         "- **Risk**: Beta, 30d annualized volatility, 6mo max drawdown, D/E, RSI(14), geopolitical exposure",
