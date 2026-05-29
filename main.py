@@ -18,14 +18,17 @@ from datetime import datetime
 import config
 from src.discovery import discover_candidates
 from src.enrichment import enrich_tickers
+from src.portfolio import attach_portfolio, get_portfolio_tickers
 from src.alphavantage import enrich_missing_targets, fetch_earnings_dates, fetch_earnings_surprises
 from src.argaam import enrich_saudi_targets
 from src.insider import fetch_insider_trades
 from src.news import attach_news, build_macro_context
+from src.newsapi_client import attach_news_sentiment
 from src.intelligence import analyze_tickers, build_macro_analysis
 from src.risk import compute_risk
 from src.shariah import check_shariah
 from src.report import generate_report, save_report
+from src.alerts import dispatch_alerts
 
 
 def main():
@@ -42,13 +45,21 @@ def main():
     # ── Stage 1: Discovery ───────────────────────────────────────────────
     print("📡 Stage 1: Discovering candidates...")
     tickers = discover_candidates()
-    print(f"   → {len(tickers)} tickers\n")
+    # Always include portfolio tickers so P&L is computed even if not in screener
+    tickers = sorted(set(tickers) | set(get_portfolio_tickers()) - config.AVOID_LIST)
+    print(f"   → {len(tickers)} tickers (incl. portfolio holdings)\n")
 
     # ── Stage 2: Enrichment ──────────────────────────────────────────────
     print("📊 Stage 2: Fetching fundamentals...")
     opportunities = enrich_tickers(tickers)
     valid = [o for o in opportunities if o.price > 0]
     print(f"   → {len(valid)} tickers with valid data\n")
+
+    # ── Stage 2x: Portfolio — attach P&L to holdings ────────────────────
+    print("💼 Stage 2x: Attaching portfolio P&L...")
+    opportunities = attach_portfolio(opportunities)
+    portfolio_count = sum(1 for o in opportunities if o.portfolio)
+    print(f"   → {portfolio_count} portfolio holdings tracked\n")
 
     # ── Stage 2a: Alpha Vantage — fill missing targets + earnings data ───
     if config.ALPHA_VANTAGE_API_KEY:
@@ -82,6 +93,15 @@ def main():
     macro = build_macro_context()
     print(f"   → {sum(len(o.news) for o in opportunities)} news articles\n")
 
+    # ── Stage 3a: NewsAPI — richer articles + keyword sentiment ─────────
+    if config.NEWSAPI_KEY:
+        print("📰 Stage 3a: NewsAPI sentiment scoring...")
+        opportunities = attach_news_sentiment(opportunities)
+        scored = sum(1 for o in opportunities if o.news_sentiment_score != 0)
+        print(f"   → {scored} tickers with sentiment scores\n")
+    else:
+        print("📰 Stage 3a: NewsAPI skipped (no API key)\n")
+
     # ── Stage 4: AI Analysis ─────────────────────────────────────────────
     if not args.no_ai and config.ANTHROPIC_API_KEY:
         print("🤖 Stage 4: Running AI analysis (Claude)...")
@@ -113,6 +133,10 @@ def main():
     legacy_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "report.md")
     with open(legacy_path, "w") as f:
         f.write(report)
+
+    # ── Stage 8: Alerts ──────────────────────────────────────────────────
+    print("🔔 Stage 8: Dispatching alerts...")
+    dispatch_alerts(opportunities, macro)
 
     print(f"{'='*60}")
     print(f"  ✅ Done! Report at: {path}")

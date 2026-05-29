@@ -69,9 +69,11 @@ def _rank_score(opp: Opportunity) -> float:
     if opp.upside is not None:
         score += w["upside"] * min(max(opp.upside, 0) / 100.0, 1.0)
 
-    # Sentiment: -10 to +10, normalize to 0-1
+    # Sentiment: Claude score preferred; NewsAPI keyword score as fallback
     if opp.analysis:
         score += w["sentiment"] * (opp.analysis.sentiment_score + 10) / 20.0
+    elif opp.news_sentiment_score != 0:
+        score += w["sentiment"] * (opp.news_sentiment_score + 10) / 20.0
 
     # Risk-adjusted: invert risk score (low risk = better rank)
     if opp.risk:
@@ -155,6 +157,43 @@ def generate_report(opportunities: list[Opportunity], macro: MacroContext) -> st
 
     lines += ["---", ""]
 
+    # ── Portfolio Summary ────────────────────────────────────────────────
+    holdings = [o for o in ranked if o.portfolio]
+    if holdings:
+        lines += ["## 💼 Portfolio Summary", ""]
+        lines += [
+            "| Ticker | Company | Shares | BEP | Current | P&L% | P&L Value | Status |",
+            "|--------|---------|-------:|----:|--------:|:----:|----------:|--------|",
+        ]
+
+        total_pl_value = 0.0
+        for opp in sorted(holdings, key=lambda o: o.portfolio.pl_pct or 0, reverse=True):
+            p = opp.portfolio
+            bep_str     = _fmt_price(p.bep, p.bep_currency)
+            current_str = _fmt_price(opp.price, opp.currency)
+            pl_str      = f"{p.pl_pct:+.1f}%" if p.pl_pct is not None else "N/A"
+            pl_emoji    = "🟢" if (p.pl_pct or 0) > 0 else ("🔴" if (p.pl_pct or 0) < 0 else "⚪")
+            val_str     = _fmt_price(abs(p.pl_value), p.bep_currency) if p.pl_value is not None else "N/A"
+            val_sign    = "+" if (p.pl_value or 0) >= 0 else "-"
+            if p.pl_value is not None:
+                total_pl_value += p.pl_value
+            lines.append(
+                f"| **{opp.ticker}** | {opp.name[:22]} | {p.shares:g} | {bep_str} | "
+                f"{current_str} | {pl_emoji} {pl_str} | {val_sign}{val_str} | {p.status} |"
+            )
+
+        # Summary row
+        gain_count = sum(1 for o in holdings if (o.portfolio.pl_pct or 0) > 0)
+        loss_count = sum(1 for o in holdings if (o.portfolio.pl_pct or 0) < 0)
+        lines += [
+            "",
+            f"**Portfolio snapshot:** {len(holdings)} positions — "
+            f"🟢 {gain_count} in profit · 🔴 {loss_count} in loss",
+            "",
+            "> ⚠️ P&L is approximate for cross-currency holdings (BEP in EUR vs price in USD).",
+        ]
+        lines += ["", "---", ""]
+
     # ── Top 10 Opportunities ─────────────────────────────────────────────
     lines += [f"## 🏆 Top 10 Investment Opportunities (6-12 Month Horizon)", ""]
     lines.append("*Ranked by composite score: analyst upside (30%) + AI sentiment (20%) + risk-adjusted (20%) + momentum (15%) + Shariah (15%)*")
@@ -180,6 +219,19 @@ def generate_report(opportunities: list[Opportunity], macro: MacroContext) -> st
             lines.append(f"| **AI Sentiment** | {opp.analysis.sentiment_score:+d}/10 |")
             if opp.analysis.catalysts:
                 lines.append(f"| **Key Catalysts** | {' · '.join(opp.analysis.catalysts[:3])} |")
+        if opp.news_sentiment_score != 0:
+            ns = opp.news_sentiment_score
+            ns_emoji = "📈" if ns > 2 else ("📉" if ns < -2 else "➡️")
+            lines.append(f"| **News Sentiment** | {ns_emoji} {ns:+.1f}/10 (keyword score) |")
+
+        # Portfolio P&L row (if held)
+        if opp.portfolio and opp.portfolio.pl_pct is not None:
+            p = opp.portfolio
+            pl_emoji = "🟢" if p.pl_pct > 0 else "🔴"
+            lines.append(
+                f"| **Your Position** | {p.shares:g} shares · BEP "
+                f"{_fmt_price(p.bep, p.bep_currency)} · P&L {pl_emoji} {p.pl_pct:+.1f}% |"
+            )
 
         if opp.risk:
             lines.append(f"| **Risk Score** | {_risk_badge(opp.risk.composite_score)} |")
@@ -351,11 +403,15 @@ def generate_report(opportunities: list[Opportunity], macro: MacroContext) -> st
         "- **Alpha Vantage**: Fills missing analyst price targets, next earnings dates, and last-quarter EPS surprise % for US tickers (free tier).",
         "- **Argaam**: Saudi-specific analyst consensus targets for Tadawul (`.SR`) tickers where yfinance has no coverage.",
         "- **SEC EDGAR Form 4**: 30-day insider buying/selling activity for US-listed stocks — classified as Bullish / Bearish / Neutral based on net share transactions.",
+        "- **NewsAPI**: Supplementary article source with financial keyword sentiment scoring (−10..+10). Used as ranking fallback when Claude AI is unavailable.",
+        "- **Portfolio P&L**: User holdings from `portfolio_data.py` — current price vs BEP, unrealised gain/loss, displayed in Portfolio Summary section.",
+        "- **Alerts**: Triggered on portfolio losses >20%, portfolio gains >100%, analyst upside >50%, insider buys, RSI extremes, upcoming earnings. Delivered to file + optional email/webhook.",
         "- **News**: Yahoo Finance ticker news + Google News RSS (global + regional macro queries for US, Europe, Asia, Middle East)",
         "- **AI Analysis**: Claude API (`claude-sonnet-4-6`) — investment thesis, sentiment, catalysts per ticker; macro regime synthesis",
         "- **Risk**: Beta, 30d annualized volatility, 6mo max drawdown, D/E, RSI(14), geopolitical exposure",
         "- **Shariah**: AAOIFI-standard screening — business activity deny-list + financial ratios (debt/cash/receivables < 33% of market cap, interest income < 5% of revenue)",
-        "- **Ranking**: Composite score = analyst upside (30%) + AI sentiment (20%) + risk-adjusted (20%) + RSI momentum (15%) + Shariah bonus (15%)",
+        "- **UAE Coverage**: Abu Dhabi (`.AD`) and Dubai (`.DU`) tickers via Yahoo Finance — FAB, ADNOCDIST, IHC, EAND, ADPORTS, EMAAR, DIB, DEWA",
+        "- **Ranking**: Composite score = analyst upside (30%) + AI sentiment or news keyword score (20%) + risk-adjusted (20%) + RSI momentum (15%) + Shariah bonus (15%)",
         "",
         f"*Report auto-generated · {run_date}*",
     ]

@@ -40,6 +40,17 @@ class MacroContext:
     macro_news: list = field(default_factory=list)
 
 @dataclass
+class PortfolioHolding:
+    ticker: str = ""
+    shares: float = 0.0
+    bep: float = 0.0              # breakeven price
+    bep_currency: str = "USD"     # currency BEP was set in
+    current_price: float = 0.0
+    pl_pct: Optional[float] = None    # % gain/loss vs BEP
+    pl_value: Optional[float] = None  # (price - BEP) × shares
+    status: str = ""              # HOLD / SELL / TRIM / etc.
+
+@dataclass
 class Opportunity:
     ticker: str = ""
     name: str = ""
@@ -79,12 +90,16 @@ class Opportunity:
     hist_prices: list = field(default_factory=list)
     # News
     news: list = field(default_factory=list)
+    # NewsAPI keyword sentiment score (-10..+10, always available)
+    news_sentiment_score: float = 0.0
     # Alpha Vantage enrichment
     earnings_date: Optional[str] = None     # next earnings date YYYY-MM-DD
     eps_surprise: Optional[float] = None    # last quarter EPS surprise %
     # Insider trading signal (SEC EDGAR Form 4)
     insider_signal: str = "Neutral"         # Bullish / Bearish / Neutral
-    insider_net_shares: int = 0             # net shares bought (positive) / sold (negative)
+    insider_net_shares: int = 0             # net shares bought (+) / sold (-)
+    # Portfolio holding (if this ticker is in user's portfolio)
+    portfolio: Optional[PortfolioHolding] = None
     # Pipeline outputs
     analysis: Optional[AnalysisResult] = None
     risk: Optional[RiskProfile] = None

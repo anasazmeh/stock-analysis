@@ -6,6 +6,7 @@ FINNHUB_API_KEY       = os.environ.get("FINNHUB_API_KEY", "")
 FRED_API_KEY          = os.environ.get("FRED_API_KEY", "")
 ALPHA_VANTAGE_API_KEY = os.environ.get("ALPHA_VANTAGE_API_KEY", "")  # free at alphavantage.co
 ARGAAM_API_KEY        = os.environ.get("ARGAAM_API_KEY", "")          # Argaam Saudi data
+NEWSAPI_KEY           = os.environ.get("NEWSAPI_KEY", "")             # free at newsapi.org
 
 # ── Claude ────────────────────────────────────────────
 CLAUDE_MODEL = "claude-sonnet-4-6"
@@ -75,6 +76,18 @@ CURATED_WATCHLIST = {
     "2082.SR": ("Saudi Arabia", "ACWA Power — renewables"),
     "2010.SR": ("Saudi Arabia", "SABIC — petrochemicals"),
     "7010.SR": ("Saudi Arabia", "STC — telecom + STC Pay fintech"),
+
+    # ── Middle East — UAE Abu Dhabi (ADX, .AD) ────────────────────────────
+    "FAB.AD":      ("UAE", "First Abu Dhabi Bank — largest UAE bank"),
+    "ADNOCDIST.AD":("UAE", "ADNOC Distribution — fuel retail + EV charging"),
+    "IHC.AD":      ("UAE", "International Holding — diversified conglomerate"),
+    "EAND.AD":     ("UAE", "e& (Etisalat) — telecom + digital services"),
+    "ADPORTS.AD":  ("UAE", "AD Ports Group — logistics + maritime"),
+
+    # ── Middle East — UAE Dubai (DFM, .DU) ────────────────────────────────
+    "EMAAR.DU":    ("UAE", "Emaar Properties — real estate + hospitality"),
+    "DIB.DU":      ("UAE", "Dubai Islamic Bank — largest Islamic bank in UAE"),
+    "DEWA.DU":     ("UAE", "DEWA — Dubai utilities, green hydrogen pivot"),
 }
 
 # ── Avoid List ────────────────────────────────────────
@@ -124,6 +137,18 @@ TTL_FRED         = 24 * 3600
 TTL_AI           = 12 * 3600
 TTL_EARNINGS     = 24 * 3600
 TTL_INSIDER      = 6  * 3600
+
+# ── Alert thresholds ──────────────────────────────────
+ALERT_EMAIL_TO       = os.environ.get("ALERT_EMAIL_TO", "")
+ALERT_EMAIL_FROM     = os.environ.get("ALERT_EMAIL_FROM", "")
+ALERT_SMTP_HOST      = os.environ.get("ALERT_SMTP_HOST", "smtp.gmail.com")
+ALERT_SMTP_PORT      = int(os.environ.get("ALERT_SMTP_PORT", "587"))
+ALERT_SMTP_PASSWORD  = os.environ.get("ALERT_SMTP_PASSWORD", "")
+ALERT_WEBHOOK_URL    = os.environ.get("ALERT_WEBHOOK_URL", "")  # Slack/Discord/generic
+ALERT_UPSIDE_MIN     = 50.0   # % — trigger when analyst upside ≥ this
+ALERT_PORTFOLIO_LOSS = -20.0  # % — trigger when P&L ≤ this
+ALERT_PORTFOLIO_GAIN = 100.0  # % — trigger when P&L ≥ this
+ALERT_EPS_BEAT_MIN   = 15.0   # % — trigger when EPS surprise ≥ this
 
 # ── Enrichment ────────────────────────────────────────
 ENRICH_WORKERS = 5    # ThreadPoolExecutor max_workers
