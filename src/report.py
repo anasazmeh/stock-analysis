@@ -57,6 +57,17 @@ def _rec_fmt(r: str) -> str:
     }.get(r, r)
 
 
+def _price_check_str(opp: Opportunity) -> str:
+    if opp.price_check == "Verified":
+        return f"✅ Verified — Finnhub {opp.price_alt:.2f} ({opp.price_as_of})"
+    if opp.price_check == "Mismatch":
+        return (f"⚠️ MISMATCH — Finnhub {opp.price_alt:.2f} ({opp.price_diff_pct:+.1f}%, "
+                f"{opp.price_as_of}). Verify on your broker before acting.")
+    if opp.price_check == "Single source":
+        return "Yahoo only (no second source for this listing)"
+    return "Not checked (Finnhub call failed)"
+
+
 def _rank_score(opp: Opportunity) -> float:
     """
     Composite ranking score (higher = better opportunity).
@@ -173,6 +184,10 @@ def generate_report(opportunities: list[Opportunity], macro: MacroContext) -> st
             p = opp.portfolio
             bep_str     = _fmt_price(p.bep, p.bep_currency)
             current_str = _fmt_price(opp.price, opp.currency)
+            if opp.price_check == "Verified":
+                current_str += " ✅"
+            elif opp.price_check == "Mismatch":
+                current_str += f" ⚠️ (Finnhub {opp.price_alt:.2f})"
             pl_str      = f"{p.pl_pct:+.1f}%" if p.pl_pct is not None else "N/A"
             pl_emoji    = "🟢" if (p.pl_pct or 0) > 0 else ("🔴" if (p.pl_pct or 0) < 0 else "⚪")
             val_str     = _fmt_price(abs(p.pl_value), p.bep_currency) if p.pl_value is not None else "N/A"
@@ -210,6 +225,7 @@ def generate_report(opportunities: list[Opportunity], macro: MacroContext) -> st
         target_str = _fmt_price(opp.target, opp.currency) if opp.target else "N/A"
         lines.append(f"| **Region / Country** | {opp.region} — {opp.country} |")
         lines.append(f"| **Price / Target / Upside** | {price_str} / {target_str} / {_upside_emoji(opp.upside)} |")
+        lines.append(f"| **Price Check** | {_price_check_str(opp)} |")
         lines.append(f"| **Market Cap** | {_mcap_str(opp.mcap, opp.currency)} |")
         lines.append(f"| **Sector** | {opp.sector} — {opp.industry} |")
         lines.append(f"| **Analyst Recommendation** | {_rec_fmt(opp.rec)} |")
@@ -417,6 +433,7 @@ def generate_report(opportunities: list[Opportunity], macro: MacroContext) -> st
         "## 📖 Methodology",
         "",
         "- **Discovery**: curated watchlist (always kept) + top 6-month-momentum names from the S&P 500 / Nasdaq-100 (Wikipedia constituent lists) and any Shariah ETF holdings files in `data/universe/` + yfinance screeners",
+        f"- **Price check**: US prices compared with Finnhub quotes (✅ within {config.PRICE_CHECK_TOLERANCE_PCT:g}% of the live price or previous close, ⚠️ otherwise). Price-based alerts are held back for mismatched tickers. Non-US prices are Yahoo only.",
         "- **SEC EDGAR filings**: last 30 days of 8-K / 6-K / 10-Q / 10-K / 20-F / S-1 / 424B4 / 13D / 13G / Form 144 for US-listed tickers and ADRs; red flags (bankruptcy, delisting notice, restated financials, auditor change, late filing) marked 🚩",
         "- **GDELT**: global news updated every 15 minutes across 65 languages (incl. Arabic for Saudi/UAE names), holdings first, plus macro searches",
         "- **Full text + FinBERT**: article bodies extracted with Trafilatura and scored with the FinBERT financial-sentiment model (−10..+10); used as the ranking fallback when Claude is unavailable",

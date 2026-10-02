@@ -14,6 +14,8 @@ Three keys unlock features already coded in the pipeline:
 | `NEWSAPI_KEY` | https://newsapi.org → Get API Key (2 min) | Keyword sentiment scoring per ticker |
 | `ALPHA_VANTAGE_API_KEY` | https://www.alphavantage.co/support/#api-key (2 min) | Missing analyst targets, earnings dates, EPS surprises |
 | `ANTHROPIC_API_KEY` | https://console.anthropic.com (5 min) | Full AI investment thesis per ticker |
+| `FINNHUB_API_KEY` | https://finnhub.io/register (free) | Second price source — flags Yahoo prices that disagree; extra company news |
+| `FRED_API_KEY` | https://fred.stlouisfed.org/docs/api/api_key.html (free) | Fed rate, CPI, yield curve, VIX in the macro section |
 
 Export them before running:
 ```bash

@@ -28,6 +28,7 @@ def _ticker_summary(opp: Opportunity) -> dict:
         "sector": opp.sector,
         "country": opp.country,
         "price": opp.price,
+        "price_check": opp.price_check,
         "analyst_target": opp.target,
         "analyst_upside_pct": opp.upside,
         "forward_pe": opp.fpe,

@@ -61,6 +61,11 @@ class Opportunity:
     region: str = "US"      # display region from REGION_MAP
     # Price data
     price: float = 0.0
+    # Second-source check: Verified / Mismatch / Single source / Unchecked
+    price_check: str = "Unchecked"
+    price_alt: Optional[float] = None        # Finnhub price
+    price_diff_pct: Optional[float] = None   # Yahoo vs Finnhub, %
+    price_as_of: str = ""                    # Finnhub quote time
     target: float = 0.0
     upside: Optional[float] = None
     # Fundamentals

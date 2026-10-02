@@ -39,8 +39,18 @@ def _check_conditions(opportunities: list[Opportunity]) -> list[dict]:
         if opp.price <= 0:
             continue
 
+        # Price-based alerts are held back when Yahoo and Finnhub disagree
+        price_ok = opp.price_check != "Mismatch"
+        if not price_ok:
+            alerts.append({
+                "level":   "WARN",
+                "ticker":  opp.ticker,
+                "message": f"Price mismatch: Yahoo {opp.price:.2f} vs Finnhub {opp.price_alt:.2f} "
+                           f"({opp.price_diff_pct:+.1f}%) — price-based alerts held back; check your broker",
+            })
+
         # ── Portfolio P&L ────────────────────────────────────────────────
-        if opp.portfolio and opp.portfolio.pl_pct is not None:
+        if price_ok and opp.portfolio and opp.portfolio.pl_pct is not None:
             pnl = opp.portfolio.pl_pct
             if pnl <= config.ALERT_PORTFOLIO_LOSS:
                 alerts.append({
@@ -56,7 +66,7 @@ def _check_conditions(opportunities: list[Opportunity]) -> list[dict]:
                 })
 
         # ── High analyst upside ──────────────────────────────────────────
-        if opp.upside is not None and opp.upside >= config.ALERT_UPSIDE_MIN:
+        if price_ok and opp.upside is not None and opp.upside >= config.ALERT_UPSIDE_MIN:
             alerts.append({
                 "level":   "BUY",
                 "ticker":  opp.ticker,
@@ -121,14 +131,14 @@ def _check_conditions(opportunities: list[Opportunity]) -> list[dict]:
                 pass
 
         # ── Dip buy signals ──────────────────────────────────────────────
-        if opp.w52_low and opp.price < opp.w52_low * 1.05:
+        if price_ok and opp.w52_low and opp.price < opp.w52_low * 1.05:
             alerts.append({
                 "level":   "DIP",
                 "ticker":  opp.ticker,
                 "message": f"Within 5% of 52w low — potential dip entry",
             })
 
-        if opp.risk and opp.risk.rsi_14 < 30:
+        if price_ok and opp.risk and opp.risk.rsi_14 < 30:
             alerts.append({
                 "level":   "DIP",
                 "ticker":  opp.ticker,
@@ -136,7 +146,7 @@ def _check_conditions(opportunities: list[Opportunity]) -> list[dict]:
             })
 
         # ── Overbought caution ───────────────────────────────────────────
-        if opp.risk and opp.risk.rsi_14 > 75:
+        if price_ok and opp.risk and opp.risk.rsi_14 > 75:
             alerts.append({
                 "level":   "WARN",
                 "ticker":  opp.ticker,

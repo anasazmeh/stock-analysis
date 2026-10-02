@@ -19,6 +19,7 @@ import config
 from src.discovery import discover_candidates
 from src.enrichment import enrich_tickers
 from src.portfolio import attach_portfolio, get_portfolio_tickers
+from src.price_check import cross_check_prices
 from src.alphavantage import enrich_missing_targets, fetch_earnings_dates, fetch_earnings_surprises
 from src.argaam import enrich_saudi_targets
 from src.insider import fetch_insider_trades
@@ -58,6 +59,13 @@ def main():
     opportunities = enrich_tickers(tickers)
     valid = [o for o in opportunities if o.price > 0]
     print(f"   → {len(valid)} tickers with valid data\n")
+
+    # ── Stage 2v: Price cross-check (Yahoo vs Finnhub) ───────────────────
+    print("🔍 Stage 2v: Cross-checking prices with Finnhub...")
+    opportunities = cross_check_prices(opportunities)
+    verified = sum(1 for o in opportunities if o.price_check == "Verified")
+    mismatched = sum(1 for o in opportunities if o.price_check == "Mismatch")
+    print(f"   → {verified} verified, {mismatched} mismatched\n")
 
     # ── Stage 2x: Portfolio — attach P&L to holdings ────────────────────
     print("💼 Stage 2x: Attaching portfolio P&L...")

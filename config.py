@@ -54,6 +54,9 @@ FILINGS_FORMS     = {"8-K", "6-K", "10-Q", "10-K", "20-F", "S-1", "F-1", "424B4"
                      "S-3", "F-3", "SC 13D", "SC 13G", "SCHEDULE 13D", "SCHEDULE 13G",
                      "144", "DEF 14A", "NT 10-K", "NT 10-Q"}
 
+# ── Price cross-check (Finnhub free key, US listings) ──
+PRICE_CHECK_TOLERANCE_PCT = 2.0   # max Yahoo vs Finnhub gap before a price is flagged
+
 # ── Full-article reading + FinBERT sentiment ──
 FULLTEXT_ENABLED       = True
 FULLTEXT_MAX_TICKERS   = 30   # holdings first
@@ -178,6 +181,7 @@ TTL_INSIDER      = 6  * 3600
 TTL_UNIVERSE     = 7  * 24 * 3600
 TTL_FILINGS      = 6  * 3600
 TTL_FULLTEXT     = 7  * 24 * 3600
+TTL_PRICE_CHECK  = 15 * 60
 
 # ── Alert thresholds ──────────────────────────────────
 ALERT_EMAIL_TO       = os.environ.get("ALERT_EMAIL_TO", "")
