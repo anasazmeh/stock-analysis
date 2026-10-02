@@ -20,7 +20,7 @@ import config
 import src.cache as cache
 from src.models import Opportunity
 
-_HEADERS = {"User-Agent": "stock-analysis-bot contact@example.com"}
+_HEADERS = {"User-Agent": config.SEC_USER_AGENT}
 _EDGAR_BASE = "https://data.sec.gov"
 _TICKERS_URL = "https://www.sec.gov/files/company_tickers.json"
 

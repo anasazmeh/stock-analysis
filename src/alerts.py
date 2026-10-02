@@ -77,6 +77,21 @@ def _check_conditions(opportunities: list[Opportunity]) -> list[dict]:
                 "message": f"Insider SELLING — net {opp.insider_net_shares:,} shares (30d)",
             })
 
+        # ── SEC filing red flags; share-sale filings only matter for holdings ─
+        for f in opp.filings:
+            if f["red_flag"]:
+                alerts.append({
+                    "level":   "DANGER",
+                    "ticker":  opp.ticker,
+                    "message": f"SEC {f['form']} {f['date']}: {', '.join(f['labels'])} — {f['url']}",
+                })
+            elif opp.portfolio and f["form"] in ("S-3", "F-3", "424B4", "144"):
+                alerts.append({
+                    "level":   "WARN",
+                    "ticker":  opp.ticker,
+                    "message": f"SEC {f['form']} {f['date']}: {', '.join(f['labels'])} — {f['url']}",
+                })
+
         # ── EPS surprises ────────────────────────────────────────────────
         if opp.eps_surprise is not None:
             if opp.eps_surprise >= config.ALERT_EPS_BEAT_MIN:

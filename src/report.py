@@ -69,9 +69,11 @@ def _rank_score(opp: Opportunity) -> float:
     if opp.upside is not None:
         score += w["upside"] * min(max(opp.upside, 0) / 100.0, 1.0)
 
-    # Sentiment: Claude score preferred; NewsAPI keyword score as fallback
+    # Sentiment: Claude score preferred; FinBERT next; NewsAPI keyword score last
     if opp.analysis:
         score += w["sentiment"] * (opp.analysis.sentiment_score + 10) / 20.0
+    elif opp.finbert_score is not None:
+        score += w["sentiment"] * (opp.finbert_score + 10) / 20.0
     elif opp.news_sentiment_score != 0:
         score += w["sentiment"] * (opp.news_sentiment_score + 10) / 20.0
 
@@ -223,6 +225,10 @@ def generate_report(opportunities: list[Opportunity], macro: MacroContext) -> st
             ns = opp.news_sentiment_score
             ns_emoji = "📈" if ns > 2 else ("📉" if ns < -2 else "➡️")
             lines.append(f"| **News Sentiment** | {ns_emoji} {ns:+.1f}/10 (keyword score) |")
+        if opp.finbert_score is not None:
+            fb = opp.finbert_score
+            fb_emoji = "📈" if fb > 2 else ("📉" if fb < -2 else "➡️")
+            lines.append(f"| **FinBERT Sentiment** | {fb_emoji} {fb:+.1f}/10 (full-text model) |")
 
         # Portfolio P&L row (if held)
         if opp.portfolio and opp.portfolio.pl_pct is not None:
@@ -245,6 +251,8 @@ def generate_report(opportunities: list[Opportunity], macro: MacroContext) -> st
             lines.append(f"| **Shariah Status** | {_shariah_badge(opp.shariah.compliant)} |")
             if opp.shariah.reasons:
                 lines.append(f"| **Shariah Notes** | {opp.shariah.reasons[0] if opp.shariah.reasons else ''} |")
+        if opp.universe_tags:
+            lines.append(f"| **Index / Shariah ETF** | {', '.join(opp.universe_tags)} |")
 
         # Alpha Vantage: earnings date + EPS surprise
         if opp.earnings_date:
@@ -267,6 +275,16 @@ def generate_report(opportunities: list[Opportunity], macro: MacroContext) -> st
                 f"| **Insider Activity** | {sig_emoji} {opp.insider_signal} — "
                 f"insiders net {direction} {abs(opp.insider_net_shares):,} shares (30d) |"
             )
+
+        # SEC EDGAR filings watch
+        if opp.filings:
+            shown = sorted(opp.filings, key=lambda f: not f["red_flag"])[:3]
+            parts = [
+                f"{'🚩 ' if f['red_flag'] else ''}[{f['form']} {f['date']}]({f['url']}) "
+                f"{', '.join(f['labels'])}"
+                for f in shown
+            ]
+            lines.append(f"| **Recent SEC Filings** | {' · '.join(parts)} |")
 
         lines.append(f"| **Rank Score** | {opp.rank_score:.1f}/100 |")
         lines.append("")
@@ -398,7 +416,10 @@ def generate_report(opportunities: list[Opportunity], macro: MacroContext) -> st
     lines += [
         "## 📖 Methodology",
         "",
-        "- **Discovery**: yfinance screeners (`undervalued_growth_stocks`, `growth_technology_stocks`, `aggressive_small_caps`, `most_actives`) + curated watchlist covering US / Europe / Asia / Middle East",
+        "- **Discovery**: curated watchlist (always kept) + top 6-month-momentum names from the S&P 500 / Nasdaq-100 (Wikipedia constituent lists) and any Shariah ETF holdings files in `data/universe/` + yfinance screeners",
+        "- **SEC EDGAR filings**: last 30 days of 8-K / 6-K / 10-Q / 10-K / 20-F / S-1 / 424B4 / 13D / 13G / Form 144 for US-listed tickers and ADRs; red flags (bankruptcy, delisting notice, restated financials, auditor change, late filing) marked 🚩",
+        "- **GDELT**: global news updated every 15 minutes across 65 languages (incl. Arabic for Saudi/UAE names), holdings first, plus macro searches",
+        "- **Full text + FinBERT**: article bodies extracted with Trafilatura and scored with the FinBERT financial-sentiment model (−10..+10); used as the ranking fallback when Claude is unavailable",
         "- **Fundamentals**: Yahoo Finance via yfinance — supports NYSE, NASDAQ, LSE, Euronext, TSE, KRX, NSE, HKEX, Tadawul (`.SR`) and more. Prices shown in local currency.",
         "- **Alpha Vantage**: Fills missing analyst price targets, next earnings dates, and last-quarter EPS surprise % for US tickers (free tier).",
         "- **Argaam**: Saudi-specific analyst consensus targets for Tadawul (`.SR`) tickers where yfinance has no coverage.",
@@ -411,7 +432,7 @@ def generate_report(opportunities: list[Opportunity], macro: MacroContext) -> st
         "- **Risk**: Beta, 30d annualized volatility, 6mo max drawdown, D/E, RSI(14), geopolitical exposure",
         "- **Shariah**: AAOIFI-standard screening — business activity deny-list + financial ratios (debt/cash/receivables < 33% of market cap, interest income < 5% of revenue)",
         "- **UAE Coverage**: Abu Dhabi (`.AD`) and Dubai (`.DU`) tickers via Yahoo Finance — FAB, ADNOCDIST, IHC, EAND, ADPORTS, EMAAR, DIB, DEWA",
-        "- **Ranking**: Composite score = analyst upside (30%) + AI sentiment or news keyword score (20%) + risk-adjusted (20%) + RSI momentum (15%) + Shariah bonus (15%)",
+        "- **Ranking**: Composite score = analyst upside (30%) + AI sentiment, else FinBERT, else news keyword score (20%) + risk-adjusted (20%) + RSI momentum (15%) + Shariah bonus (15%)",
         "",
         f"*Report auto-generated · {run_date}*",
     ]

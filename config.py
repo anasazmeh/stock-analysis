@@ -7,6 +7,8 @@ FRED_API_KEY          = os.environ.get("FRED_API_KEY", "")
 ALPHA_VANTAGE_API_KEY = os.environ.get("ALPHA_VANTAGE_API_KEY", "")  # free at alphavantage.co
 ARGAAM_API_KEY        = os.environ.get("ARGAAM_API_KEY", "")          # Argaam Saudi data
 NEWSAPI_KEY           = os.environ.get("NEWSAPI_KEY", "")             # free at newsapi.org
+# SEC fair-access policy requires a real contact in the User-Agent, e.g. "Jane Doe jane@example.com"
+SEC_USER_AGENT        = os.environ.get("SEC_USER_AGENT", "stock-analysis research contact@example.com")
 
 # ── Claude ────────────────────────────────────────────
 CLAUDE_MODEL = "claude-sonnet-4-6"
@@ -20,7 +22,43 @@ SCREENERS = [
     "most_actives",
     "day_gainers",
 ]
-MAX_TICKERS = 50
+# Curated watchlist is always kept; this caps how many extra names screeners + index universe add.
+MAX_DISCOVERED = 30
+
+# ── Index universe (free: Wikipedia constituent tables) ──
+UNIVERSE_INDICES = {
+    "S&P 500":    "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies",
+    "Nasdaq-100": "https://en.wikipedia.org/wiki/Nasdaq-100",
+}
+# Holdings CSVs downloaded from Shariah ETF issuers (e.g. SPUS, HLAL, ISWD) — file name = ETF label.
+SHARIAH_ETF_DIR   = "data/universe"
+UNIVERSE_TOP_N    = 20    # index names added per run, picked by 6-month price momentum
+
+# ── GDELT news (free, no key; GDELT asks for ≤1 request per 5 s) ──
+GDELT_ENABLED      = True
+GDELT_MAX_TICKERS  = 40   # holdings first, then curated watchlist, then the rest
+GDELT_ARTICLES     = 8
+GDELT_TIMESPAN     = "7d"
+GDELT_MACRO_QUERIES = [
+    '"Federal Reserve" interest rates',
+    '"European Central Bank" rates',
+    'Taiwan semiconductor "export controls"',
+    '"Saudi Arabia" stock market',
+    '"UAE" economy stocks',
+]
+
+# ── SEC EDGAR filings watch (free, US-listed tickers incl. ADRs) ──
+FILINGS_ENABLED   = True
+FILINGS_DAYS      = 30
+FILINGS_FORMS     = {"8-K", "6-K", "10-Q", "10-K", "20-F", "S-1", "F-1", "424B4",
+                     "S-3", "F-3", "SC 13D", "SC 13G", "SCHEDULE 13D", "SCHEDULE 13G",
+                     "144", "DEF 14A", "NT 10-K", "NT 10-Q"}
+
+# ── Full-article reading + FinBERT sentiment ──
+FULLTEXT_ENABLED       = True
+FULLTEXT_MAX_TICKERS   = 30   # holdings first
+FULLTEXT_PER_TICKER    = 3
+FINBERT_MODEL          = "ProsusAI/finbert"   # needs: pip install -r requirements-ml.txt
 
 CURATED_WATCHLIST = {
     # Ticker : (Region, Notes)
@@ -137,6 +175,9 @@ TTL_FRED         = 24 * 3600
 TTL_AI           = 12 * 3600
 TTL_EARNINGS     = 24 * 3600
 TTL_INSIDER      = 6  * 3600
+TTL_UNIVERSE     = 7  * 24 * 3600
+TTL_FILINGS      = 6  * 3600
+TTL_FULLTEXT     = 7  * 24 * 3600
 
 # ── Alert thresholds ──────────────────────────────────
 ALERT_EMAIL_TO       = os.environ.get("ALERT_EMAIL_TO", "")

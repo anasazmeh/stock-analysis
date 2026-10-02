@@ -98,6 +98,12 @@ class Opportunity:
     # Insider trading signal (SEC EDGAR Form 4)
     insider_signal: str = "Neutral"         # Bullish / Bearish / Neutral
     insider_net_shares: int = 0             # net shares bought (+) / sold (-)
+    # FinBERT score over full article text (-10..+10), None if not run
+    finbert_score: Optional[float] = None
+    # Recent SEC filings: {form, date, items, labels, red_flag, url}
+    filings: list = field(default_factory=list)
+    # Index / Shariah ETF membership, e.g. ["S&P 500", "SPUS"]
+    universe_tags: list = field(default_factory=list)
     # Portfolio holding (if this ticker is in user's portfolio)
     portfolio: Optional[PortfolioHolding] = None
     # Pipeline outputs

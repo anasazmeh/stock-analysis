@@ -15,7 +15,13 @@ from src.models import Opportunity, AnalysisResult, MacroContext
 
 def _ticker_summary(opp: Opportunity) -> dict:
     """Build a compact summary dict for sending to Claude."""
-    news_titles = [n.get("title", "") for n in (opp.news or [])[:5]]
+    news = (opp.news or [])[:6]
+    news_titles = [
+        f"[{n.get('date') or 'undated'} · {n.get('source') or '?'}] {n.get('title', '')}"
+        for n in news
+    ]
+    excerpts = [n["text"][:400] for n in news if n.get("text")][:3]
+    filings = [f"{f['date']} {f['form']}: {', '.join(f['labels'])}" for f in opp.filings[:5]]
     return {
         "ticker": opp.ticker,
         "name": opp.name,
@@ -32,6 +38,10 @@ def _ticker_summary(opp: Opportunity) -> dict:
         "gross_margin_pct": opp.gross_margin,
         "recommendation": opp.rec,
         "recent_news": news_titles,
+        "news_excerpts": excerpts,
+        "news_sentiment_finbert": opp.finbert_score,
+        "recent_sec_filings": filings,
+        "index_membership": opp.universe_tags,
     }
 
 

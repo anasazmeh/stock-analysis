@@ -23,6 +23,18 @@ export ANTHROPIC_API_KEY="your_key"
 python3 main.py
 ```
 
+### 1b. Set Up the Free No-Key Sources
+These run automatically (GDELT, SEC filings, Wikipedia index lists, article text), but need:
+
+- **SEC contact** — SEC requires a real name and email in requests:
+  `export SEC_USER_AGENT="Your Name your@email.com"`
+- **FinBERT sentiment** (optional, ~1-2 GB download): `pip install -r requirements-ml.txt`
+- **Shariah ETF holdings** (optional): download the holdings CSV from the issuer's site
+  (e.g. SPUS / HLAL / ISWD) into `data/universe/`, named after the ETF (`SPUS.csv`).
+  Refresh monthly. Their tickers are added to discovery and shown as a label.
+- GDELT asks for ≤1 request per 5 s, so Stage 3b takes ~4 min for 40 tickers
+  (`GDELT_MAX_TICKERS` in `config.py`; cached for 4 h).
+
 ### 2. Set Up Daily Automated Alerts
 Add a cron job to run the pipeline every weekday at 7 AM:
 ```bash

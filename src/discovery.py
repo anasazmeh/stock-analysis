@@ -1,47 +1,55 @@
 """
 Stage 1 — Discovery
-Finds candidate tickers via yfinance screeners + curated watchlist.
+Curated watchlist (always kept) + index/Shariah-ETF universe picks + yfinance screeners.
 """
 import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import yfinance as yf
 import config
 import src.cache as cache
+from src.universe import universe_candidates
+
+
+def _screener_tickers() -> list[str]:
+    import yfinance as yf
+    found = []
+    for screener_name in config.SCREENERS:
+        try:
+            result = yf.screen(screener_name, size=25)
+            for q in (result or {}).get("quotes", []):
+                sym = q.get("symbol", "")
+                if sym and sym not in found:
+                    found.append(sym)
+        except Exception as e:
+            print(f"  [discovery] screener '{screener_name}' failed: {e}")
+    return found
+
 
 def discover_candidates() -> list[str]:
     """
-    Return a deduplicated list of ticker symbols (up to MAX_TICKERS).
-    Sources: yfinance screeners + curated watchlist.
-    Results cached for TTL_SCREENER seconds.
+    Return the curated watchlist plus up to MAX_DISCOVERED extra names
+    (index/ETF momentum picks first, then screener hits). Cached for TTL_SCREENER.
     """
-    cache_key = "discovery:screeners"
+    cache_key = "discovery:candidates"
     cached = cache.get(cache_key, config.TTL_SCREENER)
     if cached:
         return cached
 
-    tickers: set[str] = set()
+    curated = [t for t in config.CURATED_WATCHLIST if t not in config.AVOID_LIST]
+    seen = set(curated)
 
-    # 1. Always include curated watchlist
-    tickers.update(config.CURATED_WATCHLIST.keys())
+    extras = []
+    for sym in universe_candidates(exclude=seen) + _screener_tickers():
+        if sym not in seen and sym not in config.AVOID_LIST:
+            extras.append(sym)
+            seen.add(sym)
+    dropped = max(0, len(extras) - config.MAX_DISCOVERED)
+    extras = extras[:config.MAX_DISCOVERED]
 
-    # 2. Run yfinance screeners
-    for screener_name in config.SCREENERS:
-        try:
-            result = yf.screen(screener_name, size=25)
-            if result and "quotes" in result:
-                for q in result["quotes"]:
-                    sym = q.get("symbol", "")
-                    if sym:
-                        tickers.add(sym)
-        except Exception as e:
-            print(f"  [discovery] screener '{screener_name}' failed: {e}")
-
-    # 3. Remove avoided tickers, cap and sort
-    tickers -= config.AVOID_LIST
-    result_list = sorted(tickers)[:config.MAX_TICKERS]
-
-    cache.set(cache_key, result_list)
-    print(f"  [discovery] Found {len(result_list)} candidates")
+    result_list = curated + extras
+    print(f"  [discovery] {len(curated)} curated + {len(extras)} discovered"
+          + (f" ({dropped} more cut by MAX_DISCOVERED)" if dropped else ""))
+    if extras:
+        cache.set(cache_key, result_list)  # don't cache a run where every source failed
     return result_list

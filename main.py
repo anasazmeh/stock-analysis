@@ -22,8 +22,12 @@ from src.portfolio import attach_portfolio, get_portfolio_tickers
 from src.alphavantage import enrich_missing_targets, fetch_earnings_dates, fetch_earnings_surprises
 from src.argaam import enrich_saudi_targets
 from src.insider import fetch_insider_trades
+from src.filings import fetch_recent_filings
+from src.universe import attach_universe_tags
 from src.news import attach_news, build_macro_context
+from src.gdelt import attach_gdelt_news, add_gdelt_macro
 from src.newsapi_client import attach_news_sentiment
+from src.article_reader import attach_fulltext_sentiment
 from src.intelligence import analyze_tickers, build_macro_analysis
 from src.risk import compute_risk
 from src.shariah import check_shariah
@@ -59,6 +63,7 @@ def main():
     print("💼 Stage 2x: Attaching portfolio P&L...")
     opportunities = attach_portfolio(opportunities)
     portfolio_count = sum(1 for o in opportunities if o.portfolio)
+    opportunities = attach_universe_tags(opportunities)
     print(f"   → {portfolio_count} portfolio holdings tracked\n")
 
     # ── Stage 2a: Alpha Vantage — fill missing targets + earnings data ───
@@ -87,11 +92,26 @@ def main():
     bearish = sum(1 for o in opportunities if o.insider_signal == "Bearish")
     print(f"   → {bullish} bullish, {bearish} bearish insider signals\n")
 
+    # ── Stage 2d: SEC EDGAR — recent filings watch ───────────────────────
+    if config.FILINGS_ENABLED:
+        print("🗂️  Stage 2d: SEC EDGAR filings watch...")
+        opportunities = fetch_recent_filings(opportunities)
+        flagged = sum(1 for o in opportunities if any(f["red_flag"] for f in o.filings))
+        print(f"   → {sum(len(o.filings) for o in opportunities)} recent filings, "
+              f"{flagged} tickers with red flags\n")
+
     # ── Stage 3: News ────────────────────────────────────────────────────
     print("📰 Stage 3: Gathering news & macro data...")
     opportunities = attach_news(opportunities)
     macro = build_macro_context()
     print(f"   → {sum(len(o.news) for o in opportunities)} news articles\n")
+
+    # ── Stage 3b: GDELT — global news, 15-minute updates ────────────────
+    if config.GDELT_ENABLED:
+        print("🌍 Stage 3b: GDELT global news...")
+        opportunities = attach_gdelt_news(opportunities)
+        macro = add_gdelt_macro(macro)
+        print(f"   → {sum(len(o.news) for o in opportunities)} news articles total\n")
 
     # ── Stage 3a: NewsAPI — richer articles + keyword sentiment ─────────
     if config.NEWSAPI_KEY:
@@ -101,6 +121,13 @@ def main():
         print(f"   → {scored} tickers with sentiment scores\n")
     else:
         print("📰 Stage 3a: NewsAPI skipped (no API key)\n")
+
+    # ── Stage 3c: Full article text + FinBERT sentiment ─────────────────
+    if config.FULLTEXT_ENABLED:
+        print("📖 Stage 3c: Reading full articles + FinBERT sentiment...")
+        opportunities = attach_fulltext_sentiment(opportunities)
+        print(f"   → {sum(1 for o in opportunities if o.finbert_score is not None)} "
+              f"tickers with FinBERT scores\n")
 
     # ── Stage 4: AI Analysis ─────────────────────────────────────────────
     if not args.no_ai and config.ANTHROPIC_API_KEY:
