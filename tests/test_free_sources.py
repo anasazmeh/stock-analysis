@@ -49,6 +49,7 @@ class DiscoveryTests(unittest.TestCase):
     def test_curated_always_kept_and_extras_capped_in_order(self):
         with mock.patch.object(discovery, "universe_candidates", return_value=["AAA", "BBB"]), \
              mock.patch.object(discovery, "_screener_tickers", return_value=["CCC", "GRAB", "AAA"]), \
+             mock.patch.object(discovery, "_regional_tickers", return_value=[]), \
              mock.patch.object(config, "MAX_DISCOVERED", 2), \
              mock.patch.object(discovery.cache, "get", return_value=None), \
              mock.patch.object(discovery.cache, "set"):

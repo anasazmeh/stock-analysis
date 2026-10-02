@@ -38,12 +38,13 @@ These run automatically (GDELT, SEC filings, Wikipedia index lists, article text
   (`GDELT_MAX_TICKERS` in `config.py`; cached for 4 h).
 
 ### 2. Set Up Daily Automated Alerts
-Add a cron job to run the pipeline every weekday at 7 AM:
+Put your keys in `.env` (one `KEY=value` per line — git-ignored), then add a cron job:
 ```bash
 crontab -e
-# Add this line:
-0 7 * * 1-5  cd ~/stock-analysis && python3 main.py >> ~/stock-analysis/logs/cron.log 2>&1
+# Weekdays 07:00 — logs go to logs/, exit code 2 marks a degraded run
+0 7 * * 1-5  ~/stock-analysis/scripts/run_daily.sh
 ```
+Optional: `HEALTHCHECK_URL` in `.env` (e.g. a healthchecks.io ping URL) tells you when a run fails or never starts.
 
 For email/webhook delivery of alerts, also set:
 ```bash
@@ -55,9 +56,18 @@ export ALERT_WEBHOOK_URL="https://hooks.slack.com/..."
 ```
 
 ### 3. Keep Portfolio Data Current
-- File: `portfolio_data.py`
-- Update `bep` and `shares` after every trade
-- The pipeline auto-includes your holdings in every run
+- `portfolio_data.py`: update `bep` and `shares` after every trade.
+- **Set the Yahoo tickers of your three funds** (Nasdaq-100 ETF, gold ETC, silver ETC) — they show as "not priced" until then.
+- Export DEGIRO / Revolut CSVs into `data/broker/` — every run then checks `portfolio_data.py` against them.
+- Copy `data/theses.example.json` to `data/theses.json` and write a thesis + invalidation rules per holding.
+- Add your own dates (IPO lock-ups, AGMs) to `data/events.json`.
+- Set `TAX_RESIDENCE` in `config.py`.
+
+### 4. Verify On Your Machine (blocked in the cloud sandbox)
+- First full run: check the **Data Health** section — every source should be ✅.
+- Abu Dhabi tickers use `.AD`; confirm Yahoo resolves them (a wrong listing shows as "wrong listing" in Data gaps).
+- Dubai tickers moved from `.DU` to `.AE`.
+- Saudi / UAE / India / Korea names are marked "Watch only" (not on DEGIRO/Revolut) — override in `TRADABILITY_OVERRIDES` if your broker offers them.
 
 ---
 
@@ -92,3 +102,15 @@ Tech stack suggestion: Flask + Jinja2 templates + Chart.js (no heavy frontend bu
 - [x] UAE coverage: 5 Abu Dhabi (`.AD`) + 3 Dubai (`.DU`) tickers
 - [x] AVOID_LIST — PLTR and GRAB permanently excluded
 - [x] Regional breakdown section in report
+- [x] GDELT news, SEC filings watch, Trafilatura + FinBERT, index / Shariah-ETF universe
+- [x] Finnhub price cross-check; price source, type and time on every row
+- [x] Roadmap "Now": EUR P&L via ECB FX · accurate Shariah label (AAOIFI 30/30/5, statement inputs, currency-consistent, label only) · data-quality gate + DEGRADED runs · fixed news and Form 4 parsers · grounded Claude evidence packs · single entry point + avoid-list output gate
+- [x] Roadmap "Next": event calendar + earnings blackout · Alpha Vantage budget · consensus quality · exposure caps + funds in holdings · IPO dossier mode · regional discovery · filings-driven Shariah review · Shariah second-opinion links + status history · news normalisation · trend + sell discipline · decision journal + run snapshots · Gulf symbols + broker coverage · broker CSV reconciliation · Federal Register regulatory watch · Data Health, run script, tests
+- [x] Roadmap "Later": crowding (short interest) · purification estimate · tax/broker cost notes · price-type labelling + liquidity flag · monthly scorecard vs MSCI World Islamic
+
+## ⏳ Not Done (deliberately)
+- TSMC monthly revenue / SIA chip sales as data (only the release dates are in the calendar — no stable free API).
+- Saudi Exchange / ADX / DFM announcement scraping (GDELT's translated search covers Arabic news meanwhile).
+- Alpha Vantage NEWS_SENTIMENT (the 25-call daily budget is better spent on earnings and targets; FinBERT covers sentiment).
+- OpenFIGI ISIN mapping (tradability uses exchange rules + `TRADABILITY_OVERRIDES` instead).
+- Zoya / Halal Terminal API second opinion (paid/limited; the report links to Musaffa and Zoya pages instead).

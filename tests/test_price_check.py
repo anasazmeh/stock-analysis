@@ -71,6 +71,7 @@ class CrossCheckTests(unittest.TestCase):
              mock.patch("builtins.print") as printed:
             self.assertEqual(price_check.fetch_quote("BRK-B"), {})
         self.assertEqual(get.call_args.kwargs["params"]["symbol"], "BRK.B")
+        self.assertNotIn("token", get.call_args.kwargs["params"])
         self.assertNotIn("secret-key", str(printed.call_args_list))
 
 
@@ -84,7 +85,7 @@ class OutputTests(unittest.TestCase):
         self.assertIn("Price mismatch", found[0]["message"])
 
     def test_verified_keeps_price_alerts(self):
-        opp = Opportunity(ticker="NIO", price=4.0, upside=80, target=7.2, price_check="Verified")
+        opp = Opportunity(ticker="NIO", price=4.0, upside=80, adj_upside=80, target=7.2, price_check="Verified")
         self.assertTrue(any(a["level"] == "BUY" for a in alerts._check_conditions([opp])))
 
     def test_report_strings(self):

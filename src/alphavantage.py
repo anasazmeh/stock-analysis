@@ -1,163 +1,156 @@
 """
-Alpha Vantage enrichment — fills gaps left by yfinance.
-  • Missing analyst price targets  (OVERVIEW endpoint)
-  • Next earnings date             (EARNINGS_CALENDAR endpoint)
-  • Last-quarter EPS surprise      (EARNINGS endpoint)
+Alpha Vantage enrichment (free key: 25 requests/day, 5/minute).
 
-Requires ALPHA_VANTAGE_API_KEY (free tier: 25 req/day, 5 req/min).
-All functions are no-ops when the key is absent.
+  1. EARNINGS_CALENDAR  — one bulk CSV call, next earnings dates
+  2. EARNINGS           — last-quarter EPS surprise, holdings first
+  3. OVERVIEW           — analyst target where Yahoo has none, holdings first
+
+A daily call budget (config.AV_DAILY_BUDGET) is persisted so repeated runs on the
+same day don't exhaust the quota. Replies containing "Information", "Note" or
+"Error Message" are quota/usage errors and are never cached.
 """
 import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import requests
 import csv
 import io
 import time
+from datetime import date
+
+import requests
 import config
 import src.cache as cache
 from src.models import Opportunity
 
 _BASE = "https://www.alphavantage.co/query"
-_RATE_DELAY = 12  # seconds between calls to stay under 5 req/min on free tier
+_RATE_DELAY = 12.5  # 5 calls/minute
+_ERROR_KEYS = ("Information", "Note", "Error Message")
+_CALENDAR_HEADER = {"symbol", "reportDate"}
 
 
-def _get(params: dict) -> dict | list | None:
-    """GET Alpha Vantage with retry on rate-limit (HTTP 429 or empty JSON note)."""
-    params["apikey"] = config.ALPHA_VANTAGE_API_KEY
-    for attempt in range(3):
-        try:
-            resp = requests.get(_BASE, params=params, timeout=15)
-            if resp.status_code == 429:
-                time.sleep(60)
-                continue
-            data = resp.json()
-            if isinstance(data, dict) and "Note" in data:
-                time.sleep(60)
-                continue
-            return data
-        except Exception as e:
-            print(f"  [av] request failed ({attempt+1}/3): {e}")
-            time.sleep(5)
-    return None
+class QuotaExhausted(Exception):
+    pass
 
 
-def enrich_missing_targets(opportunities: list[Opportunity]) -> list[Opportunity]:
-    """
-    Fill analyst price targets that yfinance left as 0.
-    Only calls Alpha Vantage for US-listed tickers (no exchange suffix).
-    """
+def _budget_key() -> str:
+    return f"av:budget:{date.today().isoformat()}"
+
+
+def calls_used() -> int:
+    return cache.get(_budget_key(), 86400, ignore_disabled=True) or 0
+
+
+def _spend():
+    used = calls_used()
+    if used >= config.AV_DAILY_BUDGET:
+        raise QuotaExhausted()
+    cache.set(_budget_key(), used + 1)
+
+
+def is_error_reply(data) -> str:
+    """Return the AV error text if this reply is a quota/usage message, else ''."""
+    if isinstance(data, dict):
+        for k in _ERROR_KEYS:
+            if k in data:
+                return str(data[k])[:120]
+    return ""
+
+
+def _get(params: dict):
+    _spend()
+    try:
+        resp = requests.get(_BASE, params={**params, "apikey": config.ALPHA_VANTAGE_API_KEY}, timeout=20)
+    except requests.RequestException as e:
+        print(f"  [av] request failed: {type(e).__name__}")  # no URL: it contains the key
+        return None
+    finally:
+        time.sleep(_RATE_DELAY)
+    if resp.status_code != 200:
+        print(f"  [av] HTTP {resp.status_code}")
+        return None
+    if params.get("function") == "EARNINGS_CALENDAR":
+        return resp.text
+    try:
+        data = resp.json()
+    except ValueError:
+        return None
+    err = is_error_reply(data)
+    if err:
+        print(f"  [av] {err}")
+        if "rate limit" in err.lower() or "25 requests" in err or "premium" in err.lower():
+            raise QuotaExhausted()
+        return None
+    return data
+
+
+def parse_calendar(text: str) -> list[dict]:
+    reader = csv.DictReader(io.StringIO(text or ""))
+    if not reader.fieldnames or not _CALENDAR_HEADER <= set(reader.fieldnames):
+        return []  # an error message, not the CSV
+    return [r for r in reader]
+
+
+def _priority(opportunities: list[Opportunity]) -> list[Opportunity]:
+    return sorted(opportunities, key=lambda o: (0 if o.portfolio else 1, -(o.mcap or 0)))
+
+
+def run_alpha_vantage(opportunities: list[Opportunity]) -> dict:
+    """Run the three steps within today's budget. Returns counts for the run log."""
+    stats = {"earnings_dates": 0, "eps_surprises": 0, "targets": 0, "budget_left": 0, "stopped": ""}
     if not config.ALPHA_VANTAGE_API_KEY:
-        return opportunities
+        return stats
+    us = [o for o in opportunities if o.price > 0 and "." not in o.ticker]
+    try:
+        # 1. Earnings calendar (one call)
+        rows = cache.get("av:earnings_calendar", config.TTL_EARNINGS)
+        if not rows:
+            rows = parse_calendar(_get({"function": "EARNINGS_CALENDAR", "horizon": "3month"}))
+            if rows:
+                cache.set("av:earnings_calendar", rows)
+        by_ticker = {o.ticker: o for o in us}
+        for row in rows or []:
+            o = by_ticker.get(row.get("symbol", ""))
+            if o and not o.earnings_date and row.get("reportDate"):
+                o.earnings_date = row["reportDate"]
+                stats["earnings_dates"] += 1
 
-    needs_target = [
-        o for o in opportunities
-        if (o.target == 0 or o.upside is None) and "." not in o.ticker
-    ]
-    if not needs_target:
-        return opportunities
+        # 2. EPS surprise, holdings first
+        for opp in _priority([o for o in us if o.eps_surprise is None]):
+            data = cache.get(f"av:earnings:{opp.ticker}", config.TTL_EARNINGS)
+            if not data:
+                data = _get({"function": "EARNINGS", "symbol": opp.ticker})
+                if data:
+                    cache.set(f"av:earnings:{opp.ticker}", data)
+            q = (data or {}).get("quarterlyEarnings") or []
+            if q and q[0].get("surprisePercentage") not in (None, "None", ""):
+                try:
+                    opp.eps_surprise = round(float(q[0]["surprisePercentage"]), 1)
+                    stats["eps_surprises"] += 1
+                except (TypeError, ValueError):
+                    pass
+            if not opp.portfolio and calls_used() >= config.AV_DAILY_BUDGET - config.AV_RESERVE_FOR_TARGETS:
+                break
 
-    print(f"  [av] Filling missing targets for {len(needs_target)} tickers...")
-    for opp in needs_target:
-        cache_key = f"av:overview:{opp.ticker}"
-        data = cache.get(cache_key, config.TTL_FUNDAMENTALS)
-        if not data:
-            data = _get({"function": "OVERVIEW", "symbol": opp.ticker})
-            if data:
-                cache.set(cache_key, data)
-            time.sleep(_RATE_DELAY)
-
-        if not data:
-            continue
-        try:
-            target = float(data.get("AnalystTargetPrice") or 0)
+        # 3. Missing analyst targets
+        for opp in _priority([o for o in us if not o.target]):
+            data = cache.get(f"av:overview:{opp.ticker}", config.TTL_FUNDAMENTALS)
+            if not data:
+                data = _get({"function": "OVERVIEW", "symbol": opp.ticker})
+                if data:
+                    cache.set(f"av:overview:{opp.ticker}", data)
+            try:
+                target = float((data or {}).get("AnalystTargetPrice") or 0)
+            except (TypeError, ValueError):
+                target = 0
             if target and opp.price:
                 opp.target = round(target, 2)
                 opp.upside = round((target / opp.price - 1) * 100, 1)
-                print(f"  [av] {opp.ticker}: target ${target:.2f} (upside {opp.upside:+.1f}%)")
-        except (TypeError, ValueError):
-            pass
-
-    return opportunities
-
-
-def fetch_earnings_dates(opportunities: list[Opportunity]) -> list[Opportunity]:
-    """
-    Populate earnings_date (next scheduled earnings) for US tickers.
-    Uses the EARNINGS_CALENDAR CSV endpoint (no per-ticker call — one bulk download).
-    """
-    if not config.ALPHA_VANTAGE_API_KEY:
-        return opportunities
-
-    us_opps = {o.ticker: o for o in opportunities if "." not in o.ticker}
-    if not us_opps:
-        return opportunities
-
-    cache_key = "av:earnings_calendar"
-    rows = cache.get(cache_key, config.TTL_EARNINGS)
-
-    if not rows:
-        print("  [av] Downloading earnings calendar...")
-        try:
-            params = {
-                "function": "EARNINGS_CALENDAR",
-                "horizon":  "3month",
-                "apikey":   config.ALPHA_VANTAGE_API_KEY,
-            }
-            resp = requests.get(_BASE, params=params, timeout=20)
-            if resp.status_code == 200 and resp.text.strip():
-                reader = csv.DictReader(io.StringIO(resp.text))
-                rows = [r for r in reader]
-                cache.set(cache_key, rows)
-        except Exception as e:
-            print(f"  [av] earnings calendar failed: {e}")
-            rows = []
-
-    for row in (rows or []):
-        ticker = row.get("symbol", "")
-        if ticker in us_opps and not us_opps[ticker].earnings_date:
-            date_str = row.get("reportDate", "")
-            if date_str:
-                us_opps[ticker].earnings_date = date_str
-
-    return opportunities
-
-
-def fetch_earnings_surprises(opportunities: list[Opportunity]) -> list[Opportunity]:
-    """
-    Populate eps_surprise (last quarter EPS surprise %) for US tickers.
-    Calls EARNINGS endpoint per ticker — only for tickers without a value yet.
-    """
-    if not config.ALPHA_VANTAGE_API_KEY:
-        return opportunities
-
-    needs = [
-        o for o in opportunities
-        if o.eps_surprise is None and "." not in o.ticker
-    ]
-    if not needs:
-        return opportunities
-
-    print(f"  [av] Fetching EPS surprises for {len(needs)} tickers...")
-    for opp in needs:
-        cache_key = f"av:earnings:{opp.ticker}"
-        data = cache.get(cache_key, config.TTL_EARNINGS)
-        if not data:
-            data = _get({"function": "EARNINGS", "symbol": opp.ticker})
-            if data:
-                cache.set(cache_key, data)
-            time.sleep(_RATE_DELAY)
-
-        if not data:
-            continue
-        try:
-            quarterly = data.get("quarterlyEarnings", [])
-            if quarterly:
-                latest = quarterly[0]
-                surprise_pct = float(latest.get("surprisePercentage") or 0)
-                opp.eps_surprise = round(surprise_pct, 1)
-        except (TypeError, ValueError, IndexError):
-            pass
-
-    return opportunities
+                opp.target_source = "Alpha Vantage"
+                opp.analyst_count = None  # AV gives no count → consensus marked "Unknown count"
+                stats["targets"] += 1
+    except QuotaExhausted:
+        stats["stopped"] = "daily budget reached"
+        print(f"  [av] Daily budget of {config.AV_DAILY_BUDGET} calls reached — remaining tickers skipped")
+    stats["budget_left"] = max(0, config.AV_DAILY_BUDGET - calls_used())
+    return stats

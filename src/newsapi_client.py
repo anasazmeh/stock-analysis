@@ -41,13 +41,40 @@ _NEGATIVE = {
 }
 
 
+_NEGATORS = {"not", "no", "never", "without", "fails", "failed", "despite"}
+# Phrases whose words would otherwise score the wrong way
+_PHRASES = {
+    "cut losses": 1, "cuts losses": 1, "narrowed loss": 1, "narrows loss": 1, "loss narrowed": 1,
+    "beat expectations": 1, "price cut": -1, "guidance cut": -1, "cuts guidance": -1,
+    "record loss": -1, "sell-off": -1, "selloff": -1, "buyback": 1,
+}
+
+
 def _score_text(text: str) -> float:
-    """Return sentiment score in [-10, +10] using financial keyword matching."""
+    """Sentiment in [-10, +10] from a financial keyword list, with negation and phrase handling.
+    Only a fallback: FinBERT and Claude scores take priority in the ranking."""
     if not text:
         return 0.0
-    words = set(text.lower().split())
-    pos = len(words & _POSITIVE)
-    neg = len(words & _NEGATIVE)
+    import re
+    low = text.lower()
+    pos = neg = 0
+    for phrase, sign in _PHRASES.items():
+        n = low.count(phrase)
+        if n:
+            pos += n if sign > 0 else 0
+            neg += n if sign < 0 else 0
+            low = low.replace(phrase, " ")
+    tokens = re.findall(r"[a-z][a-z'-]*", low)
+    for i, tok in enumerate(tokens):
+        sign = 1 if tok in _POSITIVE else (-1 if tok in _NEGATIVE else 0)
+        if not sign:
+            continue
+        if any(t in _NEGATORS for t in tokens[max(0, i - 2):i]):
+            sign = -sign
+        if sign > 0:
+            pos += 1
+        else:
+            neg += 1
     total = pos + neg
     if total == 0:
         return 0.0
@@ -74,8 +101,7 @@ def fetch_ticker_news(ticker: str, company_name: str = "", limit: int = 5) -> li
             "language": "en",
             "sortBy":   "publishedAt",
             "pageSize": limit,
-            "apiKey":   config.NEWSAPI_KEY,
-        }, timeout=12)
+        }, headers={"X-Api-Key": config.NEWSAPI_KEY}, timeout=12)
 
         if resp.status_code == 200:
             for item in resp.json().get("articles", []):
@@ -88,6 +114,8 @@ def fetch_ticker_news(ticker: str, company_name: str = "", limit: int = 5) -> li
                     "summary":   desc or title,
                     "source":    (item.get("source") or {}).get("name", "NewsAPI"),
                     "url":       item.get("url", ""),
+                    "date":      (item.get("publishedAt") or "")[:10],
+                    "provider":  "NewsAPI (free plan: 24h delayed)",
                     "sentiment": score,
                 })
         elif resp.status_code == 426:
@@ -98,7 +126,7 @@ def fetch_ticker_news(ticker: str, company_name: str = "", limit: int = 5) -> li
             print(f"  [newsapi] {ticker}: HTTP {resp.status_code}")
 
     except Exception as e:
-        print(f"  [newsapi] {ticker} failed: {e}")
+        print(f"  [newsapi] {ticker} failed: {type(e).__name__}")
 
     cache.set(cache_key, articles)
     return articles

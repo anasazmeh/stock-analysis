@@ -13,15 +13,11 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import time
 from datetime import date, timedelta
 
-import requests
 import config
-import src.cache as cache
 from src.models import Opportunity
-from src.insider import _load_ticker_cik_map
-
-_HEADERS = {"User-Agent": config.SEC_USER_AGENT}
-_SUBMISSIONS_URL = "https://data.sec.gov/submissions/CIK{cik}.json"
-_ARCHIVE_URL = "https://www.sec.gov/Archives/edgar/data/{cik}/{accession}/{document}"
+from src.sec import ARCHIVE_URL as _ARCHIVE_URL, cik_for
+from src.sec import load_ticker_cik_map as _load_ticker_cik_map
+from src.sec import get_recent_submissions as _get_recent_submissions
 
 ITEM_LABELS = {
     "1.01": "Material agreement",
@@ -66,23 +62,6 @@ FORM_LABELS = {
 }
 RED_FLAG_FORMS = {"NT 10-K", "NT 10-Q"}
 
-
-def _get_recent_submissions(cik: str) -> dict:
-    cache_key = f"edgar:submissions:{cik}"
-    cached = cache.get(cache_key, config.TTL_FILINGS)
-    if cached:
-        return cached
-    try:
-        resp = requests.get(_SUBMISSIONS_URL.format(cik=cik), headers=_HEADERS, timeout=15)
-        if resp.status_code != 200:
-            print(f"  [filings] CIK {cik}: HTTP {resp.status_code}")
-            return {}
-        recent = resp.json().get("filings", {}).get("recent", {})
-    except Exception as e:
-        print(f"  [filings] CIK {cik} failed: {e}")
-        return {}
-    cache.set(cache_key, recent)
-    return recent
 
 
 def parse_recent_filings(cik: str, recent: dict, days: int, forms: set) -> list[dict]:
@@ -129,7 +108,7 @@ def fetch_recent_filings(opportunities: list[Opportunity]) -> list[Opportunity]:
         return opportunities
 
     for opp in us_opps:
-        cik = cik_map.get(opp.ticker.replace("-", "."), cik_map.get(opp.ticker))
+        cik = cik_for(opp.ticker, cik_map)
         if not cik:
             continue
         recent = _get_recent_submissions(cik)

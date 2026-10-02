@@ -1,0 +1,10 @@
+{
+  "_how_to_use": "Copy to data/theses.json and edit. 'invalidation' rules mark the thesis Broken; 'review' rules mark it Review. Rule types: price_below, trend (Uptrend/Downtrend/Mixed), pl_below (%), weight_above (%), shariah_not (Yes), shariah_is (No), rel_strength_below (points vs S&P 500), insider (Bearish).",
+  "NVDA": {
+    "thesis": "AI data-centre capex keeps growing through 2027.",
+    "review_date": "2027-03-31",
+    "target_weight": 12,
+    "invalidation": [{"type": "trend", "value": "Downtrend"}, {"type": "shariah_is", "value": "No"}],
+    "review": [{"type": "weight_above", "value": 15}, {"type": "insider", "value": "Bearish"}]
+  }
+}

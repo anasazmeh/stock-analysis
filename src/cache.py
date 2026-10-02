@@ -11,8 +11,13 @@ def _cache_path(key: str) -> str:
     os.makedirs(config.CACHE_DIR, exist_ok=True)
     return os.path.join(config.CACHE_DIR, f"{h}.json")
 
-def get(key: str, ttl: int):
-    """Return cached value if fresh, else None."""
+DISABLED = False  # set by main.py --no-cache: reads miss, writes still refresh the cache
+
+
+def get(key: str, ttl: int, ignore_disabled: bool = False):
+    """Return cached value if fresh, else None. Counters (quotas) pass ignore_disabled=True."""
+    if DISABLED and not ignore_disabled:
+        return None
     path = _cache_path(key)
     if not os.path.exists(path):
         return None

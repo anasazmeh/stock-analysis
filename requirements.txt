@@ -1,7 +1,7 @@
 yfinance>=1.2.0
 pandas>=3.0
 numpy>=2.4
-anthropic>=0.86.0
+anthropic>=1.11
 feedparser>=6.0
 fredapi>=0.5
 requests>=2.31

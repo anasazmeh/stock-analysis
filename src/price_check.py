@@ -44,9 +44,8 @@ def fetch_quote(ticker: str) -> dict:
     _last_call = time.monotonic()
 
     try:
-        resp = requests.get(_QUOTE_URL, params={"symbol": ticker.replace("-", "."),  # BRK-B -> BRK.B
-                                                "token": config.FINNHUB_API_KEY},
-                            timeout=10)
+        resp = requests.get(_QUOTE_URL, params={"symbol": ticker.replace("-", ".")},  # BRK-B -> BRK.B
+                            headers={"X-Finnhub-Token": config.FINNHUB_API_KEY}, timeout=10)
     except requests.RequestException as e:
         # don't print the exception: its message can contain the URL with the API key
         print(f"  [price-check] {ticker}: request failed ({type(e).__name__})")
