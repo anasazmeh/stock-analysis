@@ -10,3 +10,4 @@ report.md
 runs/
 data/broker/
 logs/
+.venv/

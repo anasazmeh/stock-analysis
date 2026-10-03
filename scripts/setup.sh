@@ -4,10 +4,14 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-echo "== 1/4 Python packages"
-python3 -m pip install -q -r requirements.txt
+echo "== 1/4 Python packages (into .venv, a private environment in this folder)"
+# Homebrew and recent Linux Pythons refuse system-wide pip installs (PEP 668), so use a venv.
+if [[ ! -x .venv/bin/python ]]; then python3 -m venv .venv; fi
+PY=.venv/bin/python
+"$PY" -m pip install -q --upgrade pip
+"$PY" -m pip install -q -r requirements.txt
 read -r -p "Install FinBERT sentiment too? (~1-2 GB download) [y/N] " fb
-if [[ "$fb" == [yY]* ]]; then python3 -m pip install -q -r requirements-ml.txt; fi
+if [[ "$fb" == [yY]* ]]; then "$PY" -m pip install -q -r requirements-ml.txt; fi
 
 echo
 echo "== 2/4 Claude Code (used for the AI analysis — no API key, uses your Claude plan)"
@@ -56,6 +60,9 @@ ask_key FRED_API_KEY "https://fredaccount.stlouisfed.org/apikeys" "FRED — Fed 
 ask_key ALPHA_VANTAGE_API_KEY "https://www.alphavantage.co/support/#api-key" "Alpha Vantage (optional) — EPS surprises, missing analyst targets."
 
 echo
-echo "Done. Keys are in .env (private, not committed). Next:"
-echo "  python3 main.py            # full run → reports/"
-echo "  bash scripts/setup_schedule.sh   # email alerts + daily run"
+echo "Done. Keys are in .env (private, not committed)."
+echo "In each new terminal, first run:   source .venv/bin/activate"
+echo "Then:"
+echo "  python3 main.py"
+echo "  python3 dashboard/app.py"
+echo "  bash scripts/setup_schedule.sh"

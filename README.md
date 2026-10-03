@@ -7,7 +7,8 @@ Finds and reviews stock opportunities for a Shariah-compliant, EU-based portfoli
 ## Run
 
 ```bash
-bash scripts/setup.sh    # installs packages, checks Claude Code, asks for your SEC contact + free keys → .env
+bash scripts/setup.sh    # installs packages into .venv, checks Claude Code, asks for your SEC contact + free keys → .env
+source .venv/bin/activate   # in every new terminal, before the python3 commands
 claude                   # once, if you have never logged in — the AI stage uses your Claude subscription
 python3 main.py
 ```
