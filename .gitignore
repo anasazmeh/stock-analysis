@@ -5,3 +5,8 @@ __pycache__/
 *.pyc
 .env
 .claude/
+*.whl
+report.md
+runs/
+data/broker/
+logs/

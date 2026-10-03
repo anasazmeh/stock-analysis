@@ -1,116 +1,154 @@
 """
-Stage 5 — Risk Assessment
-Computes quantitative risk metrics for each opportunity.
+Stage 5 — Risk and trend.
+
+Risk metrics are None when there is not enough data; the composite only uses the
+components that exist and records how much of the weight was covered.
+Trend compares the price with its 50/200-day averages and with benchmark ETFs.
 """
 import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import math
+from typing import Optional
+
 import config
 from src.models import Opportunity, RiskProfile
 
+_6M = 126  # trading days
 
-def _compute_rsi(prices: list[float], period: int = 14) -> float:
-    """Compute RSI(14) from a list of close prices."""
+
+def compute_rsi(prices: list[float], period: int = 14) -> Optional[float]:
     if len(prices) < period + 1:
-        return 50.0
-    changes = [prices[i] - prices[i-1] for i in range(1, len(prices))]
-    gains  = [max(c, 0) for c in changes[-period:]]
-    losses = [max(-c, 0) for c in changes[-period:]]
-    avg_gain = sum(gains) / period
-    avg_loss = sum(losses) / period
+        return None
+    changes = [prices[i] - prices[i - 1] for i in range(len(prices) - period, len(prices))]
+    avg_gain = sum(max(c, 0) for c in changes) / period
+    avg_loss = sum(max(-c, 0) for c in changes) / period
     if avg_loss == 0:
         return 100.0
-    rs = avg_gain / avg_loss
-    return round(100 - (100 / (1 + rs)), 2)
+    return round(100 - 100 / (1 + avg_gain / avg_loss), 2)
 
 
-def _compute_volatility(prices: list[float], days: int = 30) -> float:
-    """Compute annualized 30-day volatility from close prices."""
+def compute_volatility(prices: list[float], days: int = 30) -> Optional[float]:
     if len(prices) < days + 1:
-        return 0.0
-    recent = prices[-(days+1):]
-    returns = [(recent[i] / recent[i-1] - 1) for i in range(1, len(recent))]
+        return None
+    recent = prices[-(days + 1):]
+    returns = [recent[i] / recent[i - 1] - 1 for i in range(1, len(recent)) if recent[i - 1] > 0]
     if len(returns) < 2:
-        return 0.0
+        return None
     mean = sum(returns) / len(returns)
-    variance = sum((r - mean) ** 2 for r in returns) / (len(returns) - 1)
-    return round(math.sqrt(variance) * math.sqrt(252) * 100, 2)  # annualized %
+    var = sum((r - mean) ** 2 for r in returns) / (len(returns) - 1)
+    return round(math.sqrt(var) * math.sqrt(252) * 100, 2)
 
 
-def _compute_max_drawdown(prices: list[float]) -> float:
-    """Compute max drawdown % over the price series."""
-    if len(prices) < 2:
-        return 0.0
-    peak = prices[0]
-    max_dd = 0.0
-    for p in prices:
-        if p > peak:
-            peak = p
+def compute_max_drawdown(prices: list[float], window: int = _6M) -> Optional[float]:
+    series = prices[-window:]
+    if len(series) < 60:
+        return None
+    peak, max_dd = series[0], 0.0
+    for p in series:
+        peak = max(peak, p)
         if peak > 0:
-            dd = (peak - p) / peak
-            max_dd = max(max_dd, dd)
-    return round(max_dd * 100, 2)  # as percentage
-
-
-def _geo_score(country: str) -> float:
-    """Convert geo exposure string to a 0-1 score."""
-    level = config.GEO_EXPOSURE.get(country, "Medium")
-    return {"Low": 0.2, "Medium": 0.5, "High": 0.9}.get(level, 0.5)
+            max_dd = max(max_dd, (peak - p) / peak)
+    return round(max_dd * 100, 2)
 
 
 def _rsi_extreme_score(rsi: float) -> float:
-    """Score based on RSI extremity (overbought/oversold risk)."""
-    if rsi > 80:
-        return 0.9   # very overbought
-    if rsi > 70:
-        return 0.6
-    if rsi < 20:
-        return 0.7   # very oversold (price risk)
-    if rsi < 30:
-        return 0.4
-    return 0.2       # neutral zone
+    if rsi > 80: return 0.9
+    if rsi > 70: return 0.6
+    if rsi < 20: return 0.7
+    if rsi < 30: return 0.4
+    return 0.2
 
 
-def compute_risk(opportunities: list[Opportunity]) -> list[Opportunity]:
-    """Compute risk profile for each opportunity."""
+def geo_level(opp: Opportunity) -> tuple[str, list[str]]:
+    """Headquarters risk, raised by supply-chain exposure (e.g. Taiwan fabs)."""
+    level = config.GEO_EXPOSURE.get(opp.country, "Medium")
+    notes = []
+    if opp.ticker in config.SUPPLY_CHAIN_GEO:
+        sc_level, why = config.SUPPLY_CHAIN_GEO[opp.ticker]
+        order = ["Low", "Medium", "High"]
+        if order.index(sc_level) > order.index(level):
+            level = sc_level
+        notes.append(why)
+    return level, notes
+
+
+def build_risk(opp: Opportunity) -> RiskProfile:
+    prices = opp.hist_prices
+    vol = compute_volatility(prices)
+    dd = compute_max_drawdown(prices)
+    rsi = compute_rsi(prices)
+    geo, geo_notes = geo_level(opp)
+
+    scores = {
+        "beta":        min(abs(opp.beta) / 5.0, 1.0) if opp.beta is not None else None,
+        "volatility":  min(vol / 100.0, 1.0) if vol is not None else None,
+        "drawdown":    min(dd / 50.0, 1.0) if dd is not None else None,
+        "debt":        min(opp.de / 300.0, 1.0) if opp.de is not None else None,
+        "geo":         {"Low": 0.2, "Medium": 0.5, "High": 0.9}[geo],
+        "rsi_extreme": _rsi_extreme_score(rsi) if rsi is not None else None,
+    }
+    w = config.RISK_WEIGHTS
+    covered = sum(w[k] for k, s in scores.items() if s is not None)
+    composite = None
+    if covered >= 0.5:
+        raw = sum(w[k] * s for k, s in scores.items() if s is not None) / covered
+        composite = round(max(1.0, min(10.0, raw * 10.0)), 2)
+
+    return RiskProfile(beta=opp.beta, volatility_30d=vol, max_drawdown_6mo=dd,
+                       debt_to_equity=opp.de, rsi_14=rsi, geo_exposure=geo, geo_notes=geo_notes,
+                       composite_score=composite, coverage=round(covered, 2))
+
+
+def _sma(prices, n):
+    return round(sum(prices[-n:]) / n, 4) if len(prices) >= n else None
+
+
+def _return(prices, n=_6M):
+    if len(prices) < n + 1 or prices[-n - 1] <= 0:
+        return None
+    return prices[-1] / prices[-n - 1] - 1
+
+
+def compute_trend(opp: Opportunity, benchmarks: dict):
+    prices = opp.hist_prices
+    opp.ma50, opp.ma200 = _sma(prices, 50), _sma(prices, 200)
+    last = prices[-1] if prices else None
+    if last is None or opp.ma50 is None:
+        opp.trend = "Unknown"
+    elif opp.ma200 is None:
+        opp.trend = "Uptrend" if last > opp.ma50 else "Downtrend"
+    elif last > opp.ma50 > opp.ma200:
+        opp.trend = "Uptrend"
+    elif last < opp.ma50 < opp.ma200:
+        opp.trend = "Downtrend"
+    else:
+        opp.trend = "Mixed"
+
+    own = _return(prices)
+    opp.rel_strength = {}
+    for sym, series in benchmarks.items():
+        bench = _return(series)
+        if own is not None and bench is not None:
+            opp.rel_strength[sym] = round((own - bench) * 100, 1)
+
+
+def trend_score(opp: Opportunity) -> Optional[float]:
+    """0..1 — trend state blended with 6-month strength vs the S&P 500."""
+    base = {"Uptrend": 1.0, "Mixed": 0.5, "Downtrend": 0.0}.get(opp.trend)
+    if base is None:
+        return None
+    rs = opp.rel_strength.get("SPY")
+    if rs is None:
+        return base
+    return round((base + max(0.0, min(1.0, (rs + 30) / 60))) / 2, 3)
+
+
+def compute_risk(opportunities: list[Opportunity], benchmarks: dict = None) -> list[Opportunity]:
     for opp in opportunities:
-        prices = opp.hist_prices
-
-        beta_val    = opp.beta or 1.0
-        vol         = _compute_volatility(prices)
-        drawdown    = _compute_max_drawdown(prices)
-        de          = opp.de or 0.0
-        rsi         = _compute_rsi(prices)
-        geo         = config.GEO_EXPOSURE.get(opp.country, "Medium")
-
-        # Normalize each metric to 0-1 risk scale
-        beta_score  = min(abs(beta_val) / 5.0, 1.0)
-        vol_score   = min(vol / 100.0, 1.0)
-        dd_score    = min(drawdown / 50.0, 1.0)
-        debt_score  = min(de / 300.0, 1.0)   # D/E > 300 = max risk
-        geo_score   = _geo_score(opp.country)
-        rsi_score   = _rsi_extreme_score(rsi)
-
-        w = config.RISK_WEIGHTS
-        composite = (
-            w["beta"]        * beta_score  +
-            w["volatility"]  * vol_score   +
-            w["drawdown"]    * dd_score    +
-            w["debt"]        * debt_score  +
-            w["geo"]         * geo_score   +
-            w["rsi_extreme"] * rsi_score
-        ) * 10.0  # scale to 1-10
-
-        opp.risk = RiskProfile(
-            beta=beta_val,
-            volatility_30d=vol,
-            max_drawdown_6mo=drawdown,
-            debt_to_equity=de,
-            rsi_14=rsi,
-            geo_exposure=geo,
-            composite_score=round(max(1.0, min(10.0, composite)), 2),
-        )
-
+        if opp.price <= 0:
+            continue
+        opp.risk = build_risk(opp)
+        compute_trend(opp, benchmarks or {})
     return opportunities

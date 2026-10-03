@@ -1,135 +1,235 @@
 """
 Stage 2 — Enrichment
-Fetches fundamentals + 6-month historical prices for each ticker.
+Fundamentals, price provenance, analyst consensus detail, Shariah statement inputs
+and 2 years of daily history (plus benchmark ETFs) from Yahoo Finance.
 """
 import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import yfinance as yf
-import pandas as pd
+import dataclasses
+import hashlib
+from datetime import datetime, timezone
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
 import config
 import src.cache as cache
 from src.models import Opportunity
 
+# Yahoo quotes some listings in minor units (pence, cents, agorot)
+_MINOR_UNITS = {"GBp": ("GBP", 100), "GBX": ("GBP", 100), "ZAc": ("ZAR", 100), "ILA": ("ILS", 100)}
+_LIVE_STATES = {"REGULAR"}
 
-def _safe_float(val, scale=1.0) -> float:
-    """Convert to float safely, returning 0.0 on failure."""
+
+def _num(val, scale=1.0):
+    """Float or None — missing data stays missing."""
     try:
-        return round(float(val) * scale, 4) if val else 0.0
+        if val is None or val == "":
+            return None
+        f = float(val)
+        if f != f:  # NaN
+            return None
+        return round(f * scale, 4)
     except (TypeError, ValueError):
-        return 0.0
+        return None
+
+
+def _statement_value(df, labels) -> tuple:
+    """Most recent value of the first matching row label, with its period."""
+    if df is None or getattr(df, "empty", True):
+        return None, ""
+    for label in labels:
+        if label in df.index:
+            row = df.loc[label].dropna()
+            if len(row):
+                col = row.index[0]
+                period = col.strftime("%Y-%m-%d") if hasattr(col, "strftime") else str(col)
+                return _num(row.iloc[0]), period
+    return None, ""
+
+
+_BALANCE_ROWS = {
+    "interest_bearing_debt": ["Total Debt"],
+    "cash_and_securities": ["Cash Cash Equivalents And Short Term Investments",
+                            "Cash And Cash Equivalents"],
+    "receivables": ["Accounts Receivable", "Receivables", "Net Receivables"],
+    "total_assets": ["Total Assets"],
+}
+_INCOME_ROWS = {
+    "interest_income": ["Interest Income", "Interest Income Non Operating"],
+    "revenue": ["Total Revenue", "Operating Revenue"],
+}
+
+
+def statement_inputs(ticker_obj) -> dict:
+    """Shariah ratio inputs from the latest annual statements (values in financial currency)."""
+    out = {}
+    periods = set()
+    try:
+        bs = ticker_obj.balance_sheet
+        inc = ticker_obj.income_stmt
+    except Exception:
+        return out
+    for key, labels in _BALANCE_ROWS.items():
+        out[key], period = _statement_value(bs, labels)
+        if period:
+            periods.add(period)
+    for key, labels in _INCOME_ROWS.items():
+        out[key], period = _statement_value(inc, labels)
+        if period:
+            periods.add(period)
+    out["period"] = max(periods) if periods else ""
+    out["source"] = "Yahoo annual statements" if periods else ""
+    return out
+
+
+def build_opportunity(ticker: str, info: dict) -> Opportunity:
+    """Map a yfinance .info dict to an Opportunity, keeping missing values as None."""
+    currency = info.get("currency") or ""
+    price = _num(info.get("currentPrice")) or _num(info.get("regularMarketPrice")) or 0.0
+    target = _num(info.get("targetMeanPrice"))
+    t_high, t_low, t_med = (_num(info.get(k)) for k in ("targetHighPrice", "targetLowPrice", "targetMedianPrice"))
+    w52_low, w52_high = _num(info.get("fiftyTwoWeekLow")), _num(info.get("fiftyTwoWeekHigh"))
+
+    if currency in _MINOR_UNITS:
+        currency, div = _MINOR_UNITS[currency]
+        price = price / div
+        target, t_high, t_low, t_med, w52_low, w52_high = (
+            v / div if v else v for v in (target, t_high, t_low, t_med, w52_low, w52_high))
+    currency = currency.upper() or "USD"
+
+    ts = info.get("regularMarketTime")
+    price_time = (datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+                  if isinstance(ts, (int, float)) and ts else "")
+    state = info.get("marketState", "") or ""
+    country = info.get("country") or "N/A"
+
+    return Opportunity(
+        ticker=ticker,
+        name=str(info.get("shortName") or info.get("longName") or ticker)[:40],
+        sector=info.get("sector") or "N/A",
+        industry=info.get("industry") or "N/A",
+        country=country,
+        currency=currency,
+        region=config.REGION_MAP.get(country, "🌐 Other"),
+        price=price,
+        price_source="Yahoo Finance" if price else "",
+        price_time=price_time,
+        price_type=("live (delayed)" if state in _LIVE_STATES else "last close") if price else "",
+        market_state=state,
+        exchange=info.get("exchange") or "",
+        quote_type=info.get("quoteType") or "",
+        financial_currency=(info.get("financialCurrency") or currency).upper(),
+        avg_volume=_num(info.get("averageVolume")),
+        dividend_rate=_num(info.get("dividendRate")),
+        short_pct_float=_num(info.get("shortPercentOfFloat"), 100),
+        target=target or 0.0,
+        target_high=t_high,
+        target_low=t_low,
+        target_median=t_med,
+        target_source="Yahoo consensus" if target else "",
+        analyst_count=int(info["numberOfAnalystOpinions"]) if info.get("numberOfAnalystOpinions") else None,
+        upside=round((target / price - 1) * 100, 1) if price and target else None,
+        fpe=_num(info.get("forwardPE")),
+        rev_growth=_num(info.get("revenueGrowth"), 100) or 0.0,
+        eps_growth=_num(info.get("earningsGrowth"), 100) or 0.0,
+        beta=_num(info.get("beta")),
+        de=_num(info.get("debtToEquity")),
+        gross_margin=_num(info.get("grossMargins"), 100) or 0.0,
+        op_margin=_num(info.get("operatingMargins"), 100) or 0.0,
+        w52_low=w52_low,
+        w52_high=w52_high,
+        rec=info.get("recommendationKey") or "N/A",
+        mcap=_num(info.get("marketCap")) or 0.0,
+        total_debt=_num(info.get("totalDebt")) or 0.0,
+        total_cash=_num(info.get("totalCash")) or 0.0,
+        total_revenue=_num(info.get("totalRevenue")) or 0.0,
+        short_ratio=_num(info.get("shortRatio")),
+        peg_ratio=_num(info.get("pegRatio")),
+        price_to_book=_num(info.get("priceToBook")),
+    )
 
 
 def _fetch_one(ticker: str) -> Opportunity:
-    """Fetch fundamentals for a single ticker from yfinance."""
-    cache_key = f"enrich:{ticker}"
+    cache_key = f"enrich:v2:{ticker}"
     cached = cache.get(cache_key, config.TTL_FUNDAMENTALS)
     if cached:
         return Opportunity(**cached)
 
+    import yfinance as yf
     try:
-        info = yf.Ticker(ticker).info
+        t = yf.Ticker(ticker)
+        info = t.info or {}
     except Exception as e:
-        print(f"  [enrich] {ticker} ERROR: {e}")
+        print(f"  [enrich] {ticker} failed: {type(e).__name__}: {str(e)[:80]}")
         return Opportunity(ticker=ticker)
 
-    price  = info.get("currentPrice") or info.get("regularMarketPrice") or 0
-    target = info.get("targetMeanPrice") or 0
+    opp = build_opportunity(ticker, info)
+    if opp.price > 0 and opp.quote_type != "ETF":
+        opp.shariah_inputs = statement_inputs(t)
+        if opp.shariah_inputs:
+            opp.shariah_inputs["currency"] = opp.financial_currency
 
-    opp = Opportunity(
-        ticker=ticker,
-        name=str(info.get("shortName", ticker))[:32],
-        sector=info.get("sector", "N/A") or "N/A",
-        industry=info.get("industry", "N/A") or "N/A",
-        country=info.get("country", "N/A") or "N/A",
-        price=_safe_float(price),
-        target=_safe_float(target),
-        upside=round((target / price - 1) * 100, 1) if price and target else None,
-        fpe=round(info.get("forwardPE") or 0, 1) or None,
-        rev_growth=_safe_float(info.get("revenueGrowth"), 100),
-        eps_growth=_safe_float(info.get("earningsGrowth"), 100),
-        beta=round(info.get("beta") or 0, 2) or None,
-        de=round(info.get("debtToEquity") or 0, 1) or None,
-        gross_margin=_safe_float(info.get("grossMargins"), 100),
-        op_margin=_safe_float(info.get("operatingMargins"), 100),
-        w52_low=info.get("fiftyTwoWeekLow"),
-        w52_high=info.get("fiftyTwoWeekHigh"),
-        rec=info.get("recommendationKey", "N/A") or "N/A",
-        mcap=info.get("marketCap") or 0,
-        # Shariah / Risk fields
-        total_debt=_safe_float(info.get("totalDebt")),
-        total_cash=_safe_float(info.get("totalCash")),
-        total_revenue=_safe_float(info.get("totalRevenue")),
-        interest_expense=_safe_float(info.get("interestExpense")),
-        total_assets=_safe_float(info.get("totalAssets")),
-        accounts_receivable=_safe_float(info.get("netReceivables")),
-        interest_income=_safe_float(info.get("interestIncome")),
-        short_ratio=info.get("shortRatio"),
-        peg_ratio=info.get("pegRatio"),
-        price_to_book=info.get("priceToBook"),
-    )
-
-    # Cache as dict (Opportunity is a dataclass)
-    import dataclasses
-    cache.set(cache_key, dataclasses.asdict(opp))
-
+    if opp.price > 0:  # never cache failed or empty payloads
+        cache.set(cache_key, dataclasses.asdict(opp))
     return opp
 
 
-def _fetch_historical(tickers: list[str]) -> dict[str, list[float]]:
-    """
-    Fetch 6-month daily closing prices for all tickers in one bulk call.
-    Returns dict: ticker -> list of close prices (oldest first).
-    """
-    cache_key = f"hist:{'_'.join(sorted(tickers))[:80]}"
+def _fetch_historical(tickers: list[str]) -> dict:
+    """2 years of daily closes for all tickers in one bulk call (oldest first)."""
+    digest = hashlib.md5(",".join(sorted(tickers)).encode()).hexdigest()
+    cache_key = f"hist:2y:{digest}"
     cached = cache.get(cache_key, config.TTL_FUNDAMENTALS)
     if cached:
         return cached
 
+    import yfinance as yf
+    import pandas as pd
+    result = {t: [] for t in tickers}
     try:
-        df = yf.download(tickers, period="6mo", auto_adjust=True, progress=False)
-        close = df["Close"] if isinstance(df.columns, pd.MultiIndex) else df[["Close"]]
-        result = {}
+        df = yf.download(tickers, period=config.HISTORY_PERIOD, auto_adjust=True,
+                         progress=False, group_by="column")
+        close = df["Close"]
+        if isinstance(close, pd.Series):  # single ticker
+            close = close.to_frame(name=tickers[0])
         for t in tickers:
-            try:
-                col = close[t] if t in close.columns else close.iloc[:, 0]
-                result[t] = [round(v, 4) for v in col.dropna().tolist()]
-            except Exception:
-                result[t] = []
+            if t in close.columns:
+                result[t] = [round(float(v), 4) for v in close[t].dropna().tolist()]
     except Exception as e:
-        print(f"  [enrich] Historical download failed: {e}")
-        result = {t: [] for t in tickers}
+        print(f"  [enrich] Historical download failed: {type(e).__name__}: {str(e)[:80]}")
+        return result
 
-    cache.set(cache_key, result)
+    if any(result.values()):
+        cache.set(cache_key, result)
     return result
 
 
-def enrich_tickers(tickers: list[str]) -> list[Opportunity]:
+def enrich_tickers(tickers: list[str]) -> tuple[list[Opportunity], dict]:
     """
-    Fetch fundamentals + historical prices for all tickers.
-    Returns list of Opportunity objects.
+    Fetch fundamentals + history for all tickers.
+    Returns (opportunities, benchmark_history) where benchmark_history maps
+    each config.BENCHMARKS symbol to its close series.
     """
     print(f"  [enrich] Fetching fundamentals for {len(tickers)} tickers...")
     opportunities = []
-
     with ThreadPoolExecutor(max_workers=config.ENRICH_WORKERS) as executor:
         futures = {executor.submit(_fetch_one, t): t for t in tickers}
         for future in as_completed(futures):
             t = futures[future]
             try:
                 opp = future.result()
-                opportunities.append(opp)
-                print(f"  \u2713 {t:<6}  ${opp.price:,.2f}")
             except Exception as e:
-                print(f"  \u2717 {t:<6}  ERROR: {e}")
-                opportunities.append(Opportunity(ticker=t))
+                print(f"  ✗ {t:<10} {type(e).__name__}")
+                opp = Opportunity(ticker=t)
+            opportunities.append(opp)
+            if opp.price > 0:
+                print(f"  ✓ {t:<10} {opp.price:,.2f} {opp.currency} ({opp.price_type})")
+            else:
+                print(f"  ✗ {t:<10} no price")
 
-    # Attach historical prices
-    print(f"  [enrich] Fetching 6-month price history...")
-    hist = _fetch_historical(tickers)
+    benchmarks = list(config.BENCHMARKS)
+    print(f"  [enrich] Fetching {config.HISTORY_PERIOD} price history (+{len(benchmarks)} benchmarks)...")
+    hist = _fetch_historical(sorted(set(tickers) | set(benchmarks)))
     for opp in opportunities:
         opp.hist_prices = hist.get(opp.ticker, [])
-
-    return opportunities
+    return opportunities, {b: hist.get(b, []) for b in benchmarks}

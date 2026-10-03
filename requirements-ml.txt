@@ -1,0 +1,4 @@
+# Optional: FinBERT sentiment (Stage 3c). Large download (~1-2 GB with torch).
+-r requirements.txt
+transformers>=4.40
+torch>=2.2
