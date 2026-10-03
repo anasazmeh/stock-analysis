@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}History · Portfolio Desk{% endblock %}
+{% block content %}
+<section>
+  <h1>History</h1>
+  <p class="sub">One point per pipeline run. Portfolio value includes trades made in between, so compare it with the benchmark loosely.</p>
+</section>
+{% set valued = runs | selectattr('value') | list %}
+<section class="panel">
+  <h2>Portfolio vs MSCI World Islamic (indexed to 100 at the first run)</h2>
+  {% if valued | length > 1 %}<div class="chart-box tall"><canvas id="histChart" aria-label="Portfolio value versus benchmark over time"></canvas></div>
+  {% else %}<p class="muted">The chart appears after two runs with portfolio values. {{ valued | length }} so far.</p>{% endif %}
+</section>
+<section class="panel">
+  <h2>Runs</h2>
+  <div class="table-wrap">
+    <table class="sortable">
+      <thead><tr><th data-sort>Run</th><th data-sort class="num">Portfolio value</th><th data-sort>Data</th><th class="wrap">Top 10</th></tr></thead>
+      <tbody>
+      {% for r in runs | reverse %}
+        <tr><td data-value="{{ r.run_at }}">{{ r.run_at | when }}</td><td class="num" data-value="{{ r.value or '' }}">{{ r.value | eur }}</td>
+          <td>{% if r.degraded %}<span class="chip bad">degraded</span>{% else %}<span class="chip good">ok</span>{% endif %}</td>
+          <td class="wrap">{{ r.top10 | join(', ') or '–' }}</td></tr>
+      {% else %}
+        <tr><td colspan="4" class="muted">No runs recorded yet.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}
+{% block scripts %}
+<script id="hist-data" type="application/json">{{ runs | tojson }}</script>
+<script>
+(function () {
+  const el = document.getElementById("histChart");
+  if (!el || !chartDefaults()) return;
+  const runs = JSON.parse(document.getElementById("hist-data").textContent).filter(r => r.value);
+  const v0 = runs[0].value, b0 = (runs.find(r => r.benchmark) || {}).benchmark;
+  const labels = runs.map(r => r.run_at.slice(0, 10));
+  const ds = [{ label: "Portfolio", data: runs.map(r => +(r.value / v0 * 100).toFixed(2)), borderColor: cssVar("--accent"), pointRadius: 2, tension: 0.2 }];
+  if (b0) ds.push({ label: "MSCI World Islamic", data: runs.map(r => r.benchmark ? +(r.benchmark / b0 * 100).toFixed(2) : null),
+                    borderColor: cssVar("--info"), borderDash: [5, 4], pointRadius: 2, tension: 0.2, spanGaps: true });
+  new Chart(el, { type: "line", data: { labels, datasets: ds },
+    options: { maintainAspectRatio: false, interaction: { mode: "index", intersect: false }, plugins: { legend: { position: "bottom", labels: { usePointStyle: true, pointStyle: "line" } } },
+      scales: { x: { grid: { display: false } }, y: { grid: { color: cssVar("--border") } } } } });
+})();
+</script>
+{% endblock %}

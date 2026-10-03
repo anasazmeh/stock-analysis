@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% from "_macros.html" import shariah, trend, thesis, pl, check %}
+{% block title %}Portfolio · Portfolio Desk{% endblock %}
+{% block content %}
+{% set p = d.portfolio %}
+<section>
+  <h1>Portfolio</h1>
+  <p class="sub">{{ p.total_value_eur | eur }} value · {{ p.total_cost_eur | eur }} cost · <span class="{{ 'up' if (p.total_pl_eur or 0) >= 0 else 'down' }}">{{ p.total_pl_eur | eur(True) }}</span> unrealised (EUR, priced holdings).
+    P&amp;L % is in each position's own breakeven currency.</p>
+</section>
+
+{% if p.breaches %}
+<section class="panel" style="border-color: var(--warn)">
+  <h2>Concentration</h2>
+  <ul class="list">{% for b in p.breaches %}<li>{{ b }}</li>{% endfor %}</ul>
+</section>
+{% endif %}
+
+<section class="panel">
+  <h2>Holdings</h2>
+  <div class="table-wrap">
+    <table class="sortable">
+      <thead><tr>
+        <th data-sort>Ticker</th><th data-sort>Name</th><th data-sort class="num">Shares</th><th data-sort class="num">Breakeven</th>
+        <th data-sort class="num">Price</th><th data-sort>Check</th><th data-sort class="num">P&amp;L %</th><th data-sort class="num">P&amp;L €</th>
+        <th data-sort class="num">Weight</th><th data-sort>Shariah</th><th data-sort>Thesis</th><th data-sort>Trend</th><th data-sort>Next event</th><th data-sort>Your status</th>
+      </tr></thead>
+      <tbody>
+      {% for o in holdings %}{% set h = o.portfolio %}
+        <tr>
+          <td><a href="{{ url_for('stock', ticker=o.ticker) }}"><strong>{{ o.ticker }}</strong></a></td>
+          <td>{{ o.name or h.name }}</td>
+          <td class="num">{{ h.shares | num(0) }}</td>
+          <td class="num" data-value="{{ h.bep }}">{{ h.bep | num }} {{ h.bep_currency }}</td>
+          <td class="num" data-value="{{ o.price }}">{{ o.price | num }} {{ o.currency }}</td>
+          <td>{{ check(o) }}</td>
+          <td class="num" data-value="{{ h.pl_pct if h.pl_pct is not none else '' }}">{% if h.pl_pct is not none %}{{ pl(h.pl_pct) }}{% else %}<span class="muted" title="{{ h.note }}">–</span>{% endif %}</td>
+          <td class="num" data-value="{{ h.pl_value_eur if h.pl_value_eur is not none else '' }}">{{ h.pl_value_eur | eur(True) }}</td>
+          <td class="num" data-value="{{ h.weight_pct if h.weight_pct is not none else '' }}">{{ h.weight_pct | pct(False) }}</td>
+          <td>{{ shariah(o.shariah) }}</td>
+          <td>{{ thesis(o.thesis_status) }}</td>
+          <td>{{ trend(o.trend) }}</td>
+          <td>{{ o.next_event or '–' }}</td>
+          <td>{{ h.status }}</td>
+        </tr>
+      {% endfor %}
+      {% for h in p.unpriced %}
+        <tr class="muted">
+          <td>{{ h.ticker or '–' }}</td><td>{{ h.name }}</td><td class="num">{{ h.shares | num(0) }}</td>
+          <td class="num">{{ h.bep | num }} {{ h.bep_currency }}</td><td colspan="5" class="wrap">Not priced — {{ h.note }}</td>
+          <td colspan="4" class="wrap">{{ h.shariah_note or '–' }}</td><td>{{ h.status }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<div class="grid-3">
+  <section class="panel"><h2>P&amp;L by position</h2><div class="chart-box" style="height: {{ [140, 60 + (chart.pl | length) * 34] | max }}px"><canvas id="plChart" aria-label="P&L percent by position"></canvas></div></section>
+  <section class="panel"><h2>Exposure by theme</h2><div class="chart-box"><canvas id="themeChart" aria-label="Exposure by theme"></canvas></div></section>
+  <section class="panel"><h2>Exposure by currency</h2><div class="chart-box"><canvas id="ccyChart" aria-label="Exposure by currency"></canvas></div></section>
+</div>
+
+<div class="grid-2">
+  {% set reviews = holdings | selectattr('thesis_status', 'in', ['Broken', 'Review']) | list %}
+  <section class="panel">
+    <h2>Thesis checks</h2>
+    {% if reviews %}
+    <ul class="list">{% for o in reviews %}<li>{{ thesis(o.thesis_status) }} <strong>{{ o.ticker }}</strong> — {{ o.thesis_notes | join('; ') }}</li>{% endfor %}</ul>
+    {% else %}<p class="muted">All holdings on track against their rules.</p>{% endif %}
+  </section>
+  <section class="panel">
+    <h2>Purification &amp; checks</h2>
+    {% if p.purification %}
+      <div class="table-wrap"><table><thead><tr><th>Ticker</th><th class="num">Dividends / yr</th><th class="num">Non-permissible</th><th class="num">To purify</th></tr></thead>
+      <tbody>{% for r in p.purification %}<tr><td>{{ r.ticker }}</td><td class="num">{{ r.dividends | num }} {{ r.currency }}</td>
+        <td class="num">{{ r.ratio | ratio }}</td><td class="num">{{ r.amount | num }} {{ r.currency }}</td></tr>{% endfor %}</tbody></table></div>
+      <p class="muted">Estimate: dividends × interest-income share. Confirm the method with your scholar.</p>
+    {% else %}<p class="muted">No dividend purification estimate (no dividend data or ratios).</p>{% endif %}
+    {% if p.broker_diffs is not none %}
+      <h2 style="margin-top:16px">Broker reconciliation</h2>
+      {% if p.broker_diffs %}<ul class="list">{% for x in p.broker_diffs %}<li><strong>{{ x.ticker }}</strong>: {{ x.issue }}</li>{% endfor %}</ul>
+      {% else %}<p><span class="chip good">matches</span> portfolio_data.py matches your broker exports.</p>{% endif %}
+    {% endif %}
+    {% if p.scorecard %}
+      <h2 style="margin-top:16px">Scorecard</h2>
+      <p>Since {{ p.scorecard.since }}: portfolio {{ pl(p.scorecard.portfolio_pct) }} vs {{ p.scorecard.benchmark }} {{ pl(p.scorecard.benchmark_pct) }}
+        <span class="muted">(approximate)</span></p>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script id="chart-data" type="application/json">{{ chart | tojson }}</script>
+<script>
+(function () {
+  if (!chartDefaults()) return;
+  const data = JSON.parse(document.getElementById("chart-data").textContent);
+  const good = cssVar("--good"), bad = cssVar("--bad");
+  const pl = data.pl.slice().sort((a, b) => b.v - a.v);
+  new Chart(document.getElementById("plChart"), {
+    type: "bar",
+    data: { labels: pl.map(x => x.t), datasets: [{ data: pl.map(x => x.v), backgroundColor: pl.map(x => x.v >= 0 ? good : bad), borderRadius: 3, maxBarThickness: 22 }] },
+    options: { indexAxis: "y", maintainAspectRatio: false, plugins: { legend: { display: false },
+      tooltip: { callbacks: { label: c => (c.raw >= 0 ? "+" : "") + c.raw.toFixed(1) + "%" } } },
+      scales: { x: { ticks: { callback: v => v + "%" }, grid: { color: cssVar("--border") } }, y: { grid: { display: false } } } }
+  });
+  function doughnut(id, obj) {
+    const labels = Object.keys(obj);
+    new Chart(document.getElementById(id), {
+      type: "doughnut",
+      data: { labels, datasets: [{ data: Object.values(obj), backgroundColor: labels.map((_, i) => cssVar(SERIES[i % SERIES.length])),
+        borderColor: cssVar("--surface"), borderWidth: 2 }] },
+      options: { maintainAspectRatio: false, cutout: "62%", plugins: { legend: { position: "bottom" },
+        tooltip: { callbacks: { label: c => c.label + ": " + c.raw.toFixed(1) + "%" } } } }
+    });
+  }
+  doughnut("themeChart", data.themes);
+  doughnut("ccyChart", data.currencies);
+})();
+</script>
+{% endblock %}

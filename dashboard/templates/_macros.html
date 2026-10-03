@@ -1,0 +1,24 @@
+{% macro shariah(s) -%}
+  {%- set st = (s or {}).get('compliant', 'Unknown') -%}
+  <span class="chip {{ st | lower }}" title="{{ ((s or {}).get('reasons') or []) | join(' · ') }}">{{ st }}</span>
+{%- endmacro %}
+
+{% macro trend(t) -%}
+  {%- set t = t or 'Unknown' -%}<span class="chip {{ t | lower }}">{{ t }}</span>
+{%- endmacro %}
+
+{% macro thesis(t) -%}
+  {%- if t -%}<span class="chip {{ t | lower | replace(' ', '') }}">{{ t }}</span>{%- else -%}<span class="muted">–</span>{%- endif -%}
+{%- endmacro %}
+
+{% macro check(o) -%}
+  {%- if o.price_check == 'Verified' -%}<span class="chip verified" title="Finnhub {{ o.price_alt | num }}">✓ verified</span>
+  {%- elif o.price_check == 'Mismatch' -%}<span class="chip mismatch" title="Finnhub {{ o.price_alt | num }} ({{ o.price_diff_pct | pct }})">mismatch</span>
+  {%- else -%}<span class="chip muted">{{ (o.price_check or 'unchecked') | lower }}</span>{%- endif -%}
+{%- endmacro %}
+
+{% macro pl(v) -%}
+  <span class="{{ 'up' if v is not none and v >= 0 else ('down' if v is not none else 'muted') }}">{{ v | pct }}</span>
+{%- endmacro %}
+
+{% macro level(l) -%}<span class="chip {{ l | lower }}">{{ l }}</span>{%- endmacro %}

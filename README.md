@@ -18,6 +18,7 @@ python3 main.py
 | `python3 main.py --no-ai` | Skip the Claude analysis |
 | `python3 main.py --no-cache` | Ignore cached data |
 | `python3 main.py --ipo "SpaceX" --broker-price 162 --amount 2000` | IPO dossier with labelled offer / market / broker prices |
+| `python3 dashboard/app.py` | Web dashboard at http://127.0.0.1:5000 (portfolio, opportunities, stock pages, history, "Refresh data" button) |
 | `scripts/run_daily.sh` | Scheduled run (reads `.env`, logs to `logs/`, optional health-check pings) |
 
 Exit codes: `0` ok · `2` degraded data · `1` avoid-list leak or missing required keys.

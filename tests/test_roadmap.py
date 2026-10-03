@@ -489,6 +489,11 @@ class EndToEndTests(unittest.TestCase):
         self.assertIn("Data Health", report_md)
         self.assertIn("SAP", report_md)
         self.assertTrue(os.listdir(os.path.join(tmp, "runs")))
+        with open(os.path.join(tmp, "latest.json")) as f:
+            snap = json.load(f)
+        self.assertTrue(snap["degraded"])
+        self.assertNotIn("PLTR", json.dumps(snap))
+        self.assertIn("SAP", {o["ticker"] for o in snap["opportunities"]})
 
 
 if __name__ == "__main__":

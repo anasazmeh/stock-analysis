@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% from "_macros.html" import shariah, trend, pl, check %}
+{% block title %}Opportunities · Portfolio Desk{% endblock %}
+{% block content %}
+<section>
+  <h1>Opportunities</h1>
+  <p class="sub">Ranked by {% for k, v in d.rank_weights.items() if v %}{{ k | replace('_', ' ') }} {{ (v * 100) | round | int }}%{{ ', ' if not loop.last }}{% endfor %}.
+    Missing data lowers a score; tickers with data gaps are not ranked. Shariah ({{ d.shariah_methodology }}) is a label, not a filter.</p>
+</section>
+
+<section class="panel">
+  <h2>Regional heatmap</h2>
+  <div class="table-wrap">
+    <table class="heat">
+      <thead><tr><th>Region</th><th class="num">Stocks</th><th class="num">Avg quality-adj. upside</th><th class="num">Avg risk (1–10)</th><th class="num">Shariah ✓</th><th>Top ranked</th></tr></thead>
+      <tbody>
+      {% for h in heat %}
+        {% set up = h.avg_up %}{% set rk = h.avg_risk %}
+        <tr>
+          <td>{{ h.region }}</td>
+          <td class="num">{{ h.n }}</td>
+          <td class="cell" style="background: color-mix(in srgb, var({{ '--good' if (up or 0) >= 0 else '--bad' }}) {{ ([((up or 0) | abs) * 1.2, 45] | min) | round | int }}%, transparent)">{{ pl(up) if up is not none else '–' }}</td>
+          <td class="cell" style="background: color-mix(in srgb, var(--warn) {{ (([((rk or 0) - 2) * 7, 45] | min) if rk else 0) | round | int }}%, transparent)">{{ rk | num(1) }}</td>
+          <td class="num">{{ h.yes }}/{{ h.n }}</td>
+          <td>{% if h.top %}<a href="{{ url_for('stock', ticker=h.top) }}">{{ h.top }}</a>{% else %}–{% endif %}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="panel">
+  <form id="filters" class="filters" role="search">
+    <input type="search" name="q" id="f-q" placeholder="Search ticker, name, sector" aria-label="Search">
+    <select name="region" id="f-region" aria-label="Region"><option value="">All regions</option>{% for r in regions %}<option>{{ r }}</option>{% endfor %}</select>
+    <select name="shariah" id="f-shariah" aria-label="Shariah status"><option value="">Any Shariah status</option>{% for s in shariah_values %}<option>{{ s }}</option>{% endfor %}</select>
+    <label><input type="checkbox" name="top" id="f-top"> Top 10 only</label>
+    <label><input type="checkbox" name="gaps" id="f-gaps" checked> Hide data gaps</label>
+    <span class="muted"><span id="shown-count">{{ rows | length }}</span> shown</span>
+  </form>
+  <div class="table-wrap">
+    <table class="sortable" id="opp-table">
+      <thead><tr>
+        <th data-sort class="num">Score</th><th data-sort>Ticker</th><th data-sort>Name</th><th data-sort>Region</th>
+        <th data-sort class="num">Price</th><th data-sort>Check</th><th data-sort class="num">Upside</th><th data-sort class="num">Quality-adj.</th>
+        <th data-sort class="num">Analysts</th><th data-sort>Trend</th><th data-sort class="num">Risk</th><th data-sort>Shariah</th>
+        <th data-sort>AI view</th><th data-sort>Next event</th><th data-sort>Notes</th>
+      </tr></thead>
+      <tbody>
+      {% for o in rows %}
+        {% set st = (o.shariah or {}).get('compliant', 'Unknown') %}
+        <tr data-search="{{ (o.ticker ~ ' ' ~ (o.name or '') ~ ' ' ~ (o.sector or '')) | lower }}" data-region="{{ o.region or 'Other' }}"
+            data-shariah="{{ st }}" data-top="{{ 1 if o.top10 else 0 }}" data-ok="{{ 1 if o.data_ok else 0 }}">
+          <td class="num">{{ o.rank_score | num(1) }}</td>
+          <td><a href="{{ url_for('stock', ticker=o.ticker) }}"><strong>{{ o.ticker }}</strong></a>{% if o.portfolio %} <span class="chip info" title="You hold this">held</span>{% endif %}</td>
+          <td>{{ o.name }}</td>
+          <td>{{ o.region }}</td>
+          <td class="num" data-value="{{ o.price }}">{{ o.price | num }} {{ o.currency }}</td>
+          <td>{{ check(o) }}</td>
+          <td class="num" data-value="{{ o.upside if o.upside is not none else '' }}">{{ pl(o.upside) }}</td>
+          <td class="num" data-value="{{ o.adj_upside if o.adj_upside is not none else '' }}">{{ pl(o.adj_upside) }}</td>
+          <td class="num" data-value="{{ o.analyst_count or '' }}">{{ o.analyst_count or '–' }}{% if o.consensus_quality and o.consensus_quality not in ('Good', 'None') %} <span class="chip warn">{{ o.consensus_quality }}</span>{% endif %}</td>
+          <td>{{ trend(o.trend) }}</td>
+          <td class="num" data-value="{{ (o.risk or {}).get('composite_score') or '' }}">{{ (o.risk or {}).get('composite_score') | num(1) }}</td>
+          <td>{{ shariah(o.shariah) }}</td>
+          <td>{% if o.analysis and o.analysis.status == 'OK' %}{{ o.analysis.new_buyer_action }}{% else %}<span class="muted">–</span>{% endif %}</td>
+          <td>{{ o.next_event or '–' }}</td>
+          <td class="wrap muted">{% if o.tradable == 'Watch only' %}watch only · {% endif %}{{ o.data_flags | join(', ') }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

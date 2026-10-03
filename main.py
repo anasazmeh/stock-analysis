@@ -111,6 +111,7 @@ def main() -> int:
     from src.output_gate import scrub
     from src.journal import latest_snapshot, what_changed, write_snapshot, append_decisions, scorecard
     from src.alerts import dispatch_alerts
+    from src.dashboard_data import build_payload, write_latest
 
     # ── 0. Broker reconciliation ─────────────────────────────────────────
     broker_diffs = run_reconciliation(HOLDINGS)
@@ -222,8 +223,9 @@ def main() -> int:
     pur = [(o.ticker, r) for o in opportunities if o.portfolio and (r := purification(o, fx))]
     ranked_now = sorted([o for o in opportunities if o.price > 0 and o.data_ok], key=lambda o: -o.rank_score)
     changes = what_changed(opportunities, ranked_now[:10], previous)
+    unpriced = unpriced_holdings(opportunities)
     report, top10 = generate_report(opportunities, macro, health=HEALTH, fx=fx, exposure=exposure,
-                                    unpriced=unpriced_holdings(opportunities), changes=changes,
+                                    unpriced=unpriced, changes=changes,
                                     purification_rows=pur, broker_diffs=broker_diffs, scorecard=card,
                                     av_stats=av_stats)
     report, removed = scrub(report)
@@ -231,7 +233,11 @@ def main() -> int:
     write_snapshot(opportunities, top10, HEALTH, prompt_digest,
                    portfolio_value_eur=exposure.get("total_value_eur"), benchmark_close=bench_close)
     append_decisions(opportunities, top10)
-    _, removed_alerts = dispatch_alerts(opportunities, macro, HEALTH, exposure, previous, broker_diffs)
+    alerts, removed_alerts = dispatch_alerts(opportunities, macro, HEALTH, exposure, previous, broker_diffs)
+    _, removed_dash = write_latest(build_payload(
+        opportunities, macro, health=HEALTH, fx=fx, exposure=exposure, unpriced=unpriced, top10=top10,
+        alerts=alerts, changes=changes, purification_rows=pur, broker_diffs=broker_diffs, scorecard=card))
+    removed_alerts += removed_dash
 
     print(f"\n{'=' * 60}\n  ✅ Report: {path}\n{'=' * 60}\n")
     if removed or removed_alerts:
