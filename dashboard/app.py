@@ -1,7 +1,7 @@
 """
 Local web dashboard for the stock-analysis pipeline.
 
-    python3 dashboard/app.py          → http://127.0.0.1:5000
+    python3 dashboard/app.py          → http://127.0.0.1:8050
 
 Reads reports/latest.json (written by every `python3 main.py` run) and the run
 history in runs/. "Refresh data" starts a pipeline run in the background.
@@ -204,6 +204,7 @@ def create_app(report_dir: str = None, runs_dir: str = None, run_cmd: list = Non
 
 
 if __name__ == "__main__":
-    port = int(os.environ.get("DASHBOARD_PORT", "5000"))
+    # Not 5000: macOS uses that port for AirPlay Receiver, which answers instead of the dashboard.
+    port = int(os.environ.get("DASHBOARD_PORT", "8050"))
     print(f"Dashboard: http://127.0.0.1:{port}  (Ctrl+C to stop)")
-    create_app().run(host="127.0.0.1", port=port, debug=False)
+    create_app().run(host="127.0.0.1", port=port, debug=False, load_dotenv=False)  # config.py reads .env

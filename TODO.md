@@ -74,7 +74,7 @@ weekday cron job (default 07:00, your computer's time). It is safe to re-run; `-
 ---
 
 ## 🖥️ Web Dashboard
-`python3 dashboard/app.py` → http://127.0.0.1:5000 (local only). Pages: Overview (alerts, what changed,
+`python3 dashboard/app.py` → http://127.0.0.1:8050 (local only). Pages: Overview (alerts, what changed,
 events, Top 10, data health), Portfolio (sortable holdings, P&L and exposure charts, thesis checks,
 purification), Opportunities (filters, sortable table, regional heatmap), a page per stock (price chart,
 AI view, Shariah ratios, risk, filings, news) and History (portfolio vs MSCI World Islamic).
