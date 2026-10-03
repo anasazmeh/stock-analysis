@@ -6,6 +6,12 @@
 
 ## 🔴 Immediate — Do These First
 
+### 0. AI analysis — no API key needed
+The Claude stage runs through your logged-in Claude Code (`claude -p`), so it uses your Claude
+subscription instead of a paid API key. Install Claude Code, run `claude` once and log in — that's it.
+Settings in `config.py`: `AI_BACKEND` ("claude-cli" / "api" / "off"), `CLAUDE_CLI_MODEL`
+("opus" / "sonnet"), `AI_MAX_TICKERS` (holdings first; lower it to use less of your plan's limits).
+
 ### 1. Get Free API Keys
 Three keys unlock features already coded in the pipeline:
 
@@ -13,7 +19,6 @@ Three keys unlock features already coded in the pipeline:
 |-----|-------------|---------|
 | `NEWSAPI_KEY` | https://newsapi.org → Get API Key (2 min) | Keyword sentiment scoring per ticker |
 | `ALPHA_VANTAGE_API_KEY` | https://www.alphavantage.co/support/#api-key (2 min) | Missing analyst targets, earnings dates, EPS surprises |
-| `ANTHROPIC_API_KEY` | https://console.anthropic.com (5 min) | Full AI investment thesis per ticker |
 | `FINNHUB_API_KEY` | https://finnhub.io/register (free) | Second price source — flags Yahoo prices that disagree; extra company news |
 | `FRED_API_KEY` | https://fred.stlouisfed.org/docs/api/api_key.html (free) | Fed rate, CPI, yield curve, VIX in the macro section |
 
@@ -21,7 +26,6 @@ Export them before running:
 ```bash
 export NEWSAPI_KEY="your_key"
 export ALPHA_VANTAGE_API_KEY="your_key"
-export ANTHROPIC_API_KEY="your_key"
 python3 main.py
 ```
 

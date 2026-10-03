@@ -354,7 +354,7 @@ def _section_methodology(lines, run_date):
         "- **News**: Yahoo, Finnhub, Google News, GDELT (65 languages), NewsAPI; deduplicated, ≤10 days old, ordered by source quality; full text via Trafilatura scored with FinBERT.",
         "- **SEC EDGAR**: Form 4 insider trades (US filers), recent 8-K/6-K/S-3/424B4/13D/13G/144 filings with red flags.",
         "- **Regulatory watch**: US Federal Register (BIS) documents on chip export controls and the Entity List, mapped to holdings.",
-        f"- **AI analysis**: Claude (`{config.CLAUDE_MODEL}`) on a dated evidence pack; must cite facts used, gives separate holder and new-buyer views, says when data is insufficient.",
+        f"- **AI analysis**: Claude ({'Claude Code `' + config.CLAUDE_CLI_MODEL + '` via your subscription' if config.AI_BACKEND == 'claude-cli' else 'API `' + config.CLAUDE_MODEL + '`'}) on a dated evidence pack; must cite facts used, gives separate holder and new-buyer views, says when data is insufficient.",
         "- **Risk**: beta, 30-day volatility, 6-month drawdown, D/E, RSI, geography incl. supply chain — computed only from available data.",
         "- **Trend**: price vs 50/200-day averages and 6-month return vs S&P 500, semiconductors and MSCI World Islamic.",
         "- **Journal**: every run is saved in `runs/`; holdings and Top 10 are logged in `data/decisions.jsonl`.",
@@ -371,7 +371,7 @@ def generate_report(opportunities: list[Opportunity], macro: MacroContext, *, he
     ranked = sorted([o for o in opportunities if o.price > 0 and o.data_ok],
                     key=lambda o: o.rank_score, reverse=True)
     top10 = ranked[:10]
-    internal = {"API keys", "SEC contact", "Data-quality gate", "Shariah screen", "Broker CSV reconciliation"}
+    internal = {"API keys", "AI backend", "SEC contact", "Data-quality gate", "Shariah screen", "Broker CSV reconciliation"}
     ok_sources = [k for k, (s, _) in (health.sources.items() if health else [])
                   if s in ("ok", "partial") and k not in internal]
     lines = []

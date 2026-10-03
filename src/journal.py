@@ -134,7 +134,7 @@ def write_snapshot(opportunities: list[Opportunity], top10: list[Opportunity], h
         "benchmark_close": benchmark_close,
         "run_at": now.isoformat(timespec="seconds"),
         "git_sha": _git_sha(),
-        "model": config.CLAUDE_MODEL,
+        "model": (f"claude-cli:{config.CLAUDE_CLI_MODEL}" if config.AI_BACKEND == "claude-cli" else config.CLAUDE_MODEL),
         "prompt_hash": prompt_hash,
         "rank_weights": config.RANK_WEIGHTS,
         "shariah_methodology": config.SHARIAH_METHODOLOGY,

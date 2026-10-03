@@ -13,6 +13,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import hashlib
 import json
+import os
+import shutil
+import subprocess
 from datetime import date
 
 import config
@@ -171,13 +174,68 @@ def validate(raw: dict, packs: dict) -> dict:
     return out
 
 
+def ai_available() -> bool:
+    """claude-cli: the `claude` command is installed · api: a key is set · off: never."""
+    if config.AI_BACKEND == "claude-cli":
+        return shutil.which(config.CLAUDE_CLI) is not None
+    if config.AI_BACKEND == "api":
+        return bool(config.ANTHROPIC_API_KEY)
+    return False
+
+
+def ai_unavailable_reason() -> str:
+    if config.AI_BACKEND == "claude-cli":
+        return f"`{config.CLAUDE_CLI}` command not found — install Claude Code and log in"
+    if config.AI_BACKEND == "api":
+        return "ANTHROPIC_API_KEY not set"
+    return "AI_BACKEND is 'off'"
+
+
+def _ai_errors() -> tuple:
+    errors = (RuntimeError, ValueError, KeyError, TypeError, subprocess.TimeoutExpired, OSError)
+    if config.AI_BACKEND == "api":
+        import anthropic
+        errors += (anthropic.APIError,)
+    return errors
+
+
 def _client():
+    if config.AI_BACKEND != "api":
+        return None
     import anthropic
     return anthropic.Anthropic(api_key=config.ANTHROPIC_API_KEY or None)
 
 
 def _call(client, user_text: str, schema: dict) -> dict:
-    """One schema-constrained request with server-side refusal fallback."""
+    if config.AI_BACKEND == "claude-cli":
+        return _call_cli(user_text, schema)
+    return _call_api(client, user_text, schema)
+
+
+def _call_cli(user_text: str, schema: dict) -> dict:
+    """
+    Run `claude -p` (Claude Code) so the analysis uses your Claude subscription.
+    ANTHROPIC_API_KEY is removed from the child environment so the CLI never
+    bills an API key; tools and MCP servers are disabled — it only reads the prompt.
+    """
+    cmd = [config.CLAUDE_CLI, "-p", "--output-format", "json", "--model", config.CLAUDE_CLI_MODEL,
+           "--tools", "", "--strict-mcp-config", "--no-session-persistence",
+           "--system-prompt", SYSTEM, "--json-schema", json.dumps(schema)]
+    env = {k: v for k, v in os.environ.items() if k not in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN")}
+    proc = subprocess.run(cmd, input=user_text, capture_output=True, text=True,
+                          timeout=config.CLAUDE_CLI_TIMEOUT, env=env)
+    if proc.returncode != 0 and not proc.stdout.strip():
+        raise RuntimeError(f"claude exited {proc.returncode}: {proc.stderr.strip()[:200]}")
+    out = json.loads(proc.stdout)
+    if out.get("is_error"):
+        raise RuntimeError(f"claude error ({out.get('subtype')}): {str(out.get('result'))[:200]}")
+    if isinstance(out.get("structured_output"), dict):
+        return out["structured_output"]
+    return json.loads(out.get("result") or "")
+
+
+def _call_api(client, user_text: str, schema: dict) -> dict:
+    """One schema-constrained API request with server-side refusal fallback (paid)."""
     response = client.beta.messages.create(
         model=config.CLAUDE_MODEL,
         max_tokens=16000,
@@ -196,6 +254,10 @@ def _call(client, user_text: str, schema: dict) -> dict:
     return json.loads(text)
 
 
+def _model_id() -> str:
+    return f"cli:{config.CLAUDE_CLI_MODEL}" if config.AI_BACKEND == "claude-cli" else config.CLAUDE_MODEL
+
+
 def _ticker_prompt(packs: list, macro: MacroContext, today: str) -> str:
     return (
         f"Today is {today}.\n\nMarket context: regime={macro.regime or 'Unknown'}; "
@@ -209,29 +271,34 @@ def _ticker_prompt(packs: list, macro: MacroContext, today: str) -> str:
 
 def analyze_tickers(opportunities: list[Opportunity], macro: MacroContext) -> tuple[list[Opportunity], str]:
     """Analyse tickers that passed the data gate. Returns (opportunities, prompt hash)."""
-    if not config.ANTHROPIC_API_KEY:
-        print("  [intelligence] No ANTHROPIC_API_KEY — skipping AI analysis")
+    if not ai_available():
+        print(f"  [intelligence] Skipping AI analysis: {ai_unavailable_reason()}")
         return opportunities, ""
-    import anthropic
     client = _client()
+    errors = _ai_errors()
     today = date.today().isoformat()
-    eligible = [o for o in opportunities if o.price > 0 and o.data_ok]
-    skipped = len([o for o in opportunities if o.price > 0]) - len(eligible)
+    usable = [o for o in opportunities if o.price > 0 and o.data_ok]
+    usable.sort(key=lambda o: (0 if o.portfolio else 1, -(o.rank_score or 0)))
+    eligible = usable[:config.AI_MAX_TICKERS]
+    skipped = len([o for o in opportunities if o.price > 0]) - len(usable)
     if skipped:
         print(f"  [intelligence] {skipped} tickers skipped (failed data-quality gate)")
+    if len(usable) > len(eligible):
+        print(f"  [intelligence] {len(usable) - len(eligible)} lower-ranked tickers not sent "
+              f"(AI_MAX_TICKERS={config.AI_MAX_TICKERS})")
     hashes = []
 
     def run(batch):
         packs = {o.ticker: evidence_pack(o) for o in batch}
         prompt = _ticker_prompt(list(packs.values()), macro, today)
-        digest = hashlib.sha256((config.CLAUDE_MODEL + SYSTEM + prompt).encode()).hexdigest()[:16]
+        digest = hashlib.sha256((_model_id() + SYSTEM + prompt).encode()).hexdigest()[:16]
         hashes.append(digest)
         key = f"ai:v2:{digest}"
         cached = cache.get(key, config.TTL_AI)
         try:
             raw = cached or _call(client, prompt, _ANALYSIS_SCHEMA)
             results = validate(raw, packs)
-        except (anthropic.APIError, RuntimeError, ValueError, KeyError, TypeError) as e:
+        except errors as e:
             print(f"  [intelligence] batch {list(packs)} failed: {type(e).__name__}: {str(e)[:120]}")
             return list(packs)
         if not cached and len(results) == len(packs):
@@ -255,9 +322,8 @@ def analyze_tickers(opportunities: list[Opportunity], macro: MacroContext) -> tu
 
 def build_macro_analysis(macro: MacroContext, opportunities: list[Opportunity]) -> MacroContext:
     """One schema-constrained call: regime, themes, geopolitical summary."""
-    if not config.ANTHROPIC_API_KEY:
+    if not ai_available():
         return macro
-    import anthropic
     headlines = [f"[{n.get('region', '')} · {n.get('date') or 'undated'} · {n.get('source', '')}] {n.get('title', '')}"
                  for n in (macro.macro_news or [])[:20]]
     indicators = {"fed_funds_pct": macro.fed_rate, "cpi_yoy_pct": macro.cpi_yoy,
@@ -271,11 +337,11 @@ def build_macro_analysis(macro: MacroContext, opportunities: list[Opportunity]) 
               f"Headlines: {json.dumps(headlines, indent=1)}\n"
               f"Sectors covered: {json.dumps(sectors)}\n"
               "Give 3-5 themes and a 2-3 sentence geopolitical summary.")
-    digest = hashlib.sha256((config.CLAUDE_MODEL + prompt).encode()).hexdigest()[:16]
+    digest = hashlib.sha256((_model_id() + prompt).encode()).hexdigest()[:16]
     cached = cache.get(f"ai:macro:v2:{digest}", config.TTL_AI)
     try:
         result = cached or _call(_client(), prompt, _MACRO_SCHEMA)
-    except (anthropic.APIError, RuntimeError, ValueError) as e:
+    except _ai_errors() as e:
         print(f"  [intelligence] Macro analysis failed: {type(e).__name__}")
         return macro
     if not cached:

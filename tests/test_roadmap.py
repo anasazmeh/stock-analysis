@@ -328,6 +328,49 @@ class IntelligenceTests(unittest.TestCase):
         self.assertIsNone(out["BBB"].sentiment_score)
 
 
+class ClaudeCliTests(unittest.TestCase):
+    def test_cli_call_uses_subscription_env_and_schema(self):
+        out = json.dumps({"type": "result", "is_error": False, "subtype": "success",
+                          "result": "{}", "structured_output": {"analyses": []}})
+        proc = mock.Mock(returncode=0, stdout=out, stderr="")
+        with mock.patch.object(config, "AI_BACKEND", "claude-cli"), \
+             mock.patch.dict(os.environ, {"ANTHROPIC_API_KEY": "sk-should-not-leak"}), \
+             mock.patch.object(intelligence.subprocess, "run", return_value=proc) as run:
+            result = intelligence._call(None, "prompt text", intelligence._ANALYSIS_SCHEMA)
+        self.assertEqual(result, {"analyses": []})
+        cmd = run.call_args.args[0]
+        self.assertEqual(cmd[:2], ["claude", "-p"])
+        self.assertIn("--json-schema", cmd)
+        self.assertEqual(cmd[cmd.index("--tools") + 1], "")
+        self.assertNotIn("ANTHROPIC_API_KEY", run.call_args.kwargs["env"])
+        self.assertEqual(run.call_args.kwargs["input"], "prompt text")
+
+    def test_cli_error_raises(self):
+        proc = mock.Mock(returncode=1, stdout=json.dumps({"is_error": True, "subtype": "error_max_turns",
+                                                          "result": "usage limit"}), stderr="")
+        with mock.patch.object(config, "AI_BACKEND", "claude-cli"), \
+             mock.patch.object(intelligence.subprocess, "run", return_value=proc):
+            with self.assertRaises(RuntimeError):
+                intelligence._call(None, "p", intelligence._MACRO_SCHEMA)
+
+    def test_analyze_with_cli_backend(self):
+        o = _stock(ticker="AAA")
+        reply = {"analyses": [{"ticker": "AAA", "status": "OK", "thesis": "t", "bull_case": "b", "bear_case": "r",
+                               "invalidation_triggers": [], "sentiment_score": 4, "catalysts": [], "risk_flags": [],
+                               "holder_action": "N/A", "new_buyer_action": "WATCH", "confidence": "medium",
+                               "evidence_used": ["price"]}]}
+        with mock.patch.object(config, "AI_BACKEND", "claude-cli"), \
+             mock.patch.object(intelligence.shutil, "which", return_value="/usr/bin/claude"), \
+             mock.patch.object(intelligence, "_call_cli", return_value=reply):
+            intelligence.analyze_tickers([o], MacroContext())
+        self.assertEqual(o.analysis.sentiment_score, 4)
+
+    def test_unavailable_when_cli_missing(self):
+        with mock.patch.object(config, "AI_BACKEND", "claude-cli"), \
+             mock.patch.object(intelligence.shutil, "which", return_value=None):
+            self.assertFalse(intelligence.ai_available())
+
+
 class AlertsGeoReportTests(unittest.TestCase):
     def test_blackout_and_caps(self):
         exp = {"total_value_eur": 10000, "themes": {"AI": 45.0}, "breaches": []}
@@ -413,7 +456,7 @@ class EndToEndTests(unittest.TestCase):
             mock.patch("src.article_reader._get_classifier", return_value=None),
             mock.patch.object(config, "GDELT_ENABLED", False),
             mock.patch.object(config, "REPORT_DIR", tmp),
-            mock.patch.object(config, "ANTHROPIC_API_KEY", ""),
+            mock.patch.object(config, "AI_BACKEND", "off"),
             mock.patch("src.journal.RUNS_DIR", os.path.join(tmp, "runs")),
             mock.patch("src.journal.DECISIONS", os.path.join(tmp, "decisions.jsonl")),
             mock.patch("src.shariah._HISTORY_PATH", os.path.join(tmp, "sh.jsonl")),

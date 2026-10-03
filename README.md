@@ -9,7 +9,8 @@ Finds and reviews stock opportunities for a Shariah-compliant, EU-based portfoli
 ```bash
 pip install -r requirements.txt          # optional FinBERT: pip install -r requirements-ml.txt
 export SEC_USER_AGENT="Your Name you@example.com"
-export ANTHROPIC_API_KEY=...  FINNHUB_API_KEY=...  FRED_API_KEY=...   # see TODO.md
+export FINNHUB_API_KEY=...  FRED_API_KEY=...      # free keys, see TODO.md
+claude                                              # log in once — the AI stage uses your Claude subscription
 python3 main.py
 ```
 
@@ -31,7 +32,7 @@ Exit codes: `0` ok · `2` degraded data · `1` avoid-list leak or missing requir
 4. **Earnings, insider trades, analyst consensus quality** (Alpha Vantage budget, SEC Form 4, rating changes).
 5. **News and macro** — Yahoo, Finnhub, Google News, GDELT, NewsAPI; deduplicated, full text scored by FinBERT; FRED indicators.
 6. **Risk, trend, regulatory watch, exposure, thesis rules, event calendar.**
-7. **Claude analysis** on a dated evidence pack (cites the facts it used, says when data is insufficient).
+7. **Claude analysis** via your logged-in Claude Code (`claude -p`, no API key) on a dated evidence pack (cites the facts it used, says when data is insufficient).
 8. **Report, run snapshot, decision journal, alerts.**
 
 ## Your files

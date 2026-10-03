@@ -6,7 +6,7 @@ Usage:
     python3 main.py                  Full pipeline run
     python3 main.py --no-ai          Skip the Claude analysis
     python3 main.py --no-cache       Ignore cached data (still refreshes the cache)
-    python3 main.py --require-keys   Stop if ANTHROPIC/FINNHUB/FRED keys are missing
+    python3 main.py --require-keys   Stop if FINNHUB/FRED keys or the `claude` command are missing
     python3 main.py --ipo "SpaceX" --broker-price 162 [--ticker SPCX] [--amount 2000]
 
 Exit codes: 0 ok · 2 degraded data · 1 avoid-list leak or missing required keys.
@@ -30,17 +30,23 @@ def _status(n_ok: int, n_total: int) -> str:
 
 
 def preflight(require_keys: bool) -> bool:
-    keys = {"ANTHROPIC_API_KEY": config.ANTHROPIC_API_KEY, "FINNHUB_API_KEY": config.FINNHUB_API_KEY,
-            "FRED_API_KEY": config.FRED_API_KEY, "ALPHA_VANTAGE_API_KEY": config.ALPHA_VANTAGE_API_KEY,
-            "NEWSAPI_KEY": config.NEWSAPI_KEY}
+    from src.intelligence import ai_available, ai_unavailable_reason
+    keys = {"FINNHUB_API_KEY": config.FINNHUB_API_KEY, "FRED_API_KEY": config.FRED_API_KEY,
+            "ALPHA_VANTAGE_API_KEY": config.ALPHA_VANTAGE_API_KEY, "NEWSAPI_KEY": config.NEWSAPI_KEY}
+    if config.AI_BACKEND == "api":
+        keys["ANTHROPIC_API_KEY"] = config.ANTHROPIC_API_KEY
+    HEALTH.record("AI backend", "ok" if ai_available() else "skipped",
+                  config.AI_BACKEND + ("" if ai_available() else f" — {ai_unavailable_reason()}"))
     missing = [k for k, v in keys.items() if not v]
     HEALTH.record("API keys", "ok" if not missing else "partial",
                   "all set" if not missing else "missing: " + ", ".join(missing))
     if "contact@example.com" in config.SEC_USER_AGENT:
         HEALTH.record("SEC contact", "partial", "set SEC_USER_AGENT to your name and email (SEC requirement)")
-    required = [k for k in ("ANTHROPIC_API_KEY", "FINNHUB_API_KEY", "FRED_API_KEY") if not keys[k]]
+    required = [k for k in ("FINNHUB_API_KEY", "FRED_API_KEY") if not keys[k]]
+    if config.AI_BACKEND != "off" and not ai_available():
+        required.append(ai_unavailable_reason())
     if require_keys and required:
-        print(f"❌ Missing required keys: {', '.join(required)}")
+        print(f"❌ Missing: {', '.join(required)}")
         return False
     return True
 
@@ -62,7 +68,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Investment Opportunity Finder")
     parser.add_argument("--no-ai", action="store_true", help="Skip Claude analysis")
     parser.add_argument("--no-cache", action="store_true", help="Ignore cached data")
-    parser.add_argument("--require-keys", action="store_true", help="Exit if core API keys are missing")
+    parser.add_argument("--require-keys", action="store_true", help="Exit if FINNHUB/FRED keys or the claude CLI are missing")
     parser.add_argument("--ipo", help="Build an IPO dossier for this company name and exit")
     parser.add_argument("--broker-price", type=float, help="IPO: price shown at your broker")
     parser.add_argument("--ticker", help="IPO: listing ticker, if trading")
@@ -194,14 +200,15 @@ def main() -> int:
 
     # ── 7. Claude: macro first, then per-ticker evidence packs ───────────
     prompt_digest = ""
-    if not args.no_ai and config.ANTHROPIC_API_KEY:
+    from src.intelligence import ai_available
+    if not args.no_ai and ai_available():
         print("🤖 Stage 7: Claude analysis...")
         macro = build_macro_analysis(macro, opportunities)
         opportunities, prompt_digest = analyze_tickers(opportunities, macro)
         n = sum(o.analysis is not None for o in opportunities)
         HEALTH.record("Claude analysis", _status(n, sum(o.data_ok for o in priced)), f"{n} tickers")
     else:
-        HEALTH.record("Claude analysis", "skipped", "--no-ai or no key")
+        HEALTH.record("Claude analysis", "skipped", "--no-ai, AI_BACKEND=off, or `claude` not installed")
     for o in opportunities:
         o.rank_score = rank_score(o)
     print()
