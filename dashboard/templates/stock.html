@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% from "_macros.html" import shariah, trend, thesis, pl, check, level %}
+{% block title %}{{ o.ticker }} · Portfolio Desk{% endblock %}
+{% block content %}
+{% set a = o.analysis %}{% set s = o.shariah or {} %}{% set r = o.risk or {} %}{% set h = o.portfolio %}
+<section>
+  <p class="sub"><a href="{{ url_for('opportunities') }}">← Opportunities</a></p>
+  <h1>{{ o.ticker }} — {{ o.name }}</h1>
+  <p class="sub">{{ o.sector }} · {{ o.industry }} · {{ o.region }}{% if o.country and o.country not in (o.region or '') %} · {{ o.country }}{% endif %}
+    {% if o.universe_tags %}· {{ o.universe_tags | join(', ') }}{% endif %}
+    {% if o.tradable == 'Watch only' %}· <span class="chip warn">watch only at DEGIRO/Revolut</span>{% endif %}</p>
+</section>
+
+<section class="kpis">
+  <div class="kpi"><div class="label">Price</div><div class="value">{{ o.price | num }} {{ o.currency }}</div>
+    <div class="muted">{{ o.price_type }} · {{ o.price_time or 'time unknown' }}</div><div>{{ check(o) }}</div></div>
+  <div class="kpi"><div class="label">Analyst target</div><div class="value">{{ o.target | num }}</div>
+    <div class="muted">{{ o.analyst_count or '?' }} analysts · {{ o.consensus_quality or 'no consensus' }}</div></div>
+  <div class="kpi"><div class="label">Upside (quality-adj.)</div><div class="value">{{ pl(o.adj_upside) }}</div><div class="muted">raw {{ o.upside | pct }}</div></div>
+  <div class="kpi"><div class="label">Shariah</div><div class="value">{{ shariah(o.shariah) }}</div><div class="muted">{{ s.methodology }}</div></div>
+  <div class="kpi"><div class="label">Rank score</div><div class="value">{{ o.rank_score | num(1) }}</div>{% if o.top10 %}<div><span class="chip good">top 10</span></div>{% endif %}</div>
+</section>
+
+{% if alerts %}
+<section class="panel"><h2>Alerts</h2>
+  <ul class="alerts">{% for x in alerts %}<li class="{{ x.level }}">{{ level(x.level) }}<span>{{ x.ticker }}</span><span class="msg">{{ x.message }}</span></li>{% endfor %}</ul>
+</section>
+{% endif %}
+
+<div class="grid-2">
+  <section class="panel">
+    <h2>Price, 6 months</h2>
+    {% if o.history | length > 1 %}<div class="chart-box"><canvas id="priceChart" aria-label="Six-month price chart"></canvas></div>
+    {% else %}<p class="muted">No price history this run.</p>{% endif %}
+    <dl class="kv" style="margin-top:12px">
+      <dt>Trend</dt><dd>{{ trend(o.trend) }} · 50d {{ o.ma50 | num }} · 200d {{ o.ma200 | num }}</dd>
+      {% for k, v in o.rel_strength.items() %}<dt>6m vs {{ k }}</dt><dd>{{ pl(v) | replace('%', ' pts') }}</dd>{% endfor %}
+      <dt>Next event</dt><dd>{{ o.next_event or '–' }}{% if o.days_to_event is not none %} ({{ o.days_to_event }} trading days){% endif %}</dd>
+    </dl>
+  </section>
+
+  <section class="panel">
+    <h2>AI view</h2>
+    {% if a and a.status == 'OK' %}
+      <p>{{ a.thesis }}</p>
+      <dl class="kv">
+        <dt>Bull case</dt><dd>{{ a.bull_case }}</dd>
+        <dt>Bear case</dt><dd>{{ a.bear_case }}</dd>
+        {% if a.invalidation_triggers %}<dt>Invalidation</dt><dd>{{ a.invalidation_triggers | join(' · ') }}</dd>{% endif %}
+        {% if h %}<dt>For you (holder)</dt><dd><strong>{{ a.holder_action }}</strong></dd>{% endif %}
+        <dt>New buyer</dt><dd><strong>{{ a.new_buyer_action }}</strong> · sentiment {{ a.sentiment_score }}/10 · confidence {{ a.confidence }}</dd>
+        {% if a.catalysts %}<dt>Catalysts</dt><dd>{{ a.catalysts | join(' · ') }}</dd>{% endif %}
+        {% if a.risk_flags %}<dt>Risk flags</dt><dd>{{ a.risk_flags | join(' · ') }}</dd>{% endif %}
+        {% if a.evidence_used %}<dt>Evidence used</dt><dd class="muted">{{ a.evidence_used | join(', ') }}</dd>{% endif %}
+      </dl>
+    {% elif a %}<p class="muted">Claude reported insufficient data for a view.</p>
+    {% else %}<p class="muted">No AI analysis for this ticker this run{% if not o.data_ok %} (failed the data-quality check){% endif %}.</p>{% endif %}
+    {% if o.finbert_score is not none %}<p class="muted">FinBERT news sentiment: {{ o.finbert_score | num(1) }}/10</p>{% endif %}
+  </section>
+</div>
+
+<div class="grid-3">
+  <section class="panel">
+    <h2>Shariah screen</h2>
+    <dl class="kv">
+      <dt>Status</dt><dd>{{ shariah(o.shariah) }}{% if s.previous and s.previous != s.compliant %} <span class="muted">(was {{ s.previous }})</span>{% endif %}</dd>
+      <dt>Activity</dt><dd>{{ s.activity_screen or '–' }}</dd>
+      <dt>Debt / mcap</dt><dd>{{ s.debt_ratio | ratio }}</dd>
+      <dt>Cash+securities / mcap</dt><dd>{{ s.cash_ratio | ratio }}</dd>
+      <dt>Interest income / income</dt><dd>{{ s.income_ratio | ratio }}</dd>
+      <dt>Inputs</dt><dd class="muted">{{ s.inputs_source or '–' }}</dd>
+    </dl>
+    {% if s.reasons %}<ul class="list">{% for x in s.reasons %}<li>{{ x }}</li>{% endfor %}</ul>{% endif %}
+    {% if s.second_opinion %}<p>Second opinion: {% for k, v in s.second_opinion.items() %}<a href="{{ v }}" target="_blank" rel="noopener">{{ k }}</a>{{ ' · ' if not loop.last }}{% endfor %}</p>{% endif %}
+  </section>
+
+  <section class="panel">
+    <h2>Risk</h2>
+    <dl class="kv">
+      <dt>Composite</dt><dd>{{ r.composite_score | num(1) }} / 10 <span class="muted">({{ ((r.coverage or 0) * 100) | round | int }}% of inputs available)</span></dd>
+      <dt>Beta</dt><dd>{{ r.beta | num }}</dd>
+      <dt>Volatility 30d</dt><dd>{{ r.volatility_30d | pct(False) }}</dd>
+      <dt>Max drawdown 6m</dt><dd>{{ r.max_drawdown_6mo | pct(False) }}</dd>
+      <dt>RSI 14</dt><dd>{{ r.rsi_14 | num(0) }}</dd>
+      <dt>Geography</dt><dd>{{ r.geo_exposure or '–' }}{% if r.geo_notes %}<br><span class="muted">{{ r.geo_notes | join('; ') }}</span>{% endif %}</dd>
+      {% if o.short_pct_float %}<dt>Short interest</dt><dd>{{ o.short_pct_float | pct(False) }} of float</dd>{% endif %}
+      <dt>Insider (30d)</dt><dd>{{ o.insider_signal }}{% if o.insider_net_shares %} · net {{ o.insider_net_shares }} shares{% endif %}</dd>
+      {% if o.eps_surprise is not none %}<dt>EPS surprise</dt><dd>{{ pl(o.eps_surprise) }}</dd>{% endif %}
+    </dl>
+  </section>
+
+  <section class="panel">
+    <h2>Your position</h2>
+    {% if h %}
+    <dl class="kv">
+      <dt>Shares</dt><dd>{{ h.shares | num(0) }}</dd>
+      <dt>Breakeven</dt><dd>{{ h.bep | num }} {{ h.bep_currency }}</dd>
+      <dt>P&amp;L</dt><dd>{{ pl(h.pl_pct) }} · {{ h.pl_value_eur | eur(True) }}</dd>
+      <dt>Weight</dt><dd>{{ h.weight_pct | pct(False) }}</dd>
+      <dt>Themes</dt><dd>{{ h.themes | join(', ') or '–' }}</dd>
+      <dt>Thesis</dt><dd>{{ thesis(o.thesis_status) }}</dd>
+      <dt>Your status</dt><dd>{{ h.status or '–' }}</dd>
+    </dl>
+    {% if o.thesis_notes %}<ul class="list">{% for x in o.thesis_notes %}<li>{{ x }}</li>{% endfor %}</ul>{% endif %}
+    {% else %}<p class="muted">You don't hold this stock.</p>{% endif %}
+  </section>
+</div>
+
+<div class="grid-2">
+  <section class="panel">
+    <h2>Recent SEC filings</h2>
+    {% if o.filings %}<ul class="list">{% for f in o.filings %}<li>{% if f.red_flag %}<span class="chip bad">red flag</span> {% endif %}
+      <a href="{{ f.url }}" target="_blank" rel="noopener">{{ f.form }} · {{ f.date }}</a> — {{ f.labels | join(', ') }}</li>{% endfor %}</ul>
+    {% else %}<p class="muted">No recent filings (or not an SEC filer).</p>{% endif %}
+  </section>
+  <section class="panel">
+    <h2>News</h2>
+    {% if o.news %}<ul class="list">{% for n in o.news %}<li>{% if n.url %}<a href="{{ n.url }}" target="_blank" rel="noopener">{{ n.title }}</a>{% else %}{{ n.title }}{% endif %}
+      <span class="muted">— {{ n.source }}{% if n.date %}, {{ n.date }}{% endif %}</span></li>{% endfor %}</ul>
+    {% else %}<p class="muted">No recent news.</p>{% endif %}
+  </section>
+</div>
+
+{% if o.data_flags %}<section class="panel"><h2>Data notes</h2><p>{{ o.data_flags | join(' · ') }}</p></section>{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script id="price-data" type="application/json">{{ {"history": o.history, "ma50": o.ma50, "ma200": o.ma200} | tojson }}</script>
+<script>
+(function () {
+  const el = document.getElementById("priceChart");
+  if (!el || !chartDefaults()) return;
+  const d = JSON.parse(document.getElementById("price-data").textContent);
+  const labels = d.history.map((_, i) => i - d.history.length + 1);
+  const ds = [{ label: "Close", data: d.history, borderColor: cssVar("--accent"), backgroundColor: "transparent",
+                pointRadius: 0, borderWidth: 2, tension: 0.15 }];
+  if (d.ma50) ds.push({ label: "50-day avg", data: d.history.map(() => d.ma50), borderColor: cssVar("--info"), borderDash: [4, 4], pointRadius: 0, borderWidth: 1 });
+  if (d.ma200) ds.push({ label: "200-day avg", data: d.history.map(() => d.ma200), borderColor: cssVar("--warn"), borderDash: [2, 4], pointRadius: 0, borderWidth: 1 });
+  new Chart(el, { type: "line", data: { labels, datasets: ds },
+    options: { maintainAspectRatio: false, interaction: { mode: "index", intersect: false },
+      plugins: { legend: { position: "bottom", labels: { usePointStyle: true, pointStyle: "line" } } },
+      scales: { x: { title: { display: true, text: "trading days ago" }, ticks: { maxTicksLimit: 7 }, grid: { display: false } },
+                y: { grid: { color: cssVar("--border") } } } } });
+})();
+</script>
+{% endblock %}

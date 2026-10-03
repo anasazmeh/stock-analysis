@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Portfolio Desk{% endblock %}</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%231f6f5c'/%3E%3Cpath d='M3 11l3-3 2 2 5-5' stroke='white' stroke-width='1.8' fill='none'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <script src="{{ url_for('static', filename='vendor/chart.umd.js') }}"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="{{ url_for('overview') }}">Portfolio Desk</a>
+    <nav class="nav" aria-label="Main">
+      {% set ep = request.endpoint %}
+      <a href="{{ url_for('overview') }}" class="{{ 'active' if ep == 'overview' }}">Overview{% if nav_alert_count %}<span class="badge" title="Danger + buy alerts">{{ nav_alert_count }}</span>{% endif %}</a>
+      <a href="{{ url_for('portfolio') }}" class="{{ 'active' if ep == 'portfolio' }}">Portfolio</a>
+      <a href="{{ url_for('opportunities') }}" class="{{ 'active' if ep in ('opportunities', 'stock') }}">Opportunities</a>
+      <a href="{{ url_for('history') }}" class="{{ 'active' if ep == 'history' }}">History</a>
+    </nav>
+    <div class="runinfo">
+      <span>{% if run_at %}Last run {{ run_at | when }}{% else %}No run yet{% endif %}</span>
+      <span id="refresh-status" aria-live="polite"></span>
+      <button id="refresh-btn" type="button">Refresh data</button>
+    </div>
+  </header>
+  <main>
+    {% if degraded %}
+    <div class="banner" role="alert"><strong>Degraded run.</strong> {{ degraded_reasons | join('; ') }}. Buy and dip alerts were held back — treat this data as incomplete.</div>
+    {% endif %}
+    {% block content %}{% endblock %}
+  </main>
+  <p class="disclaimer">Not financial advice. Check prices on your broker before acting.</p>
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

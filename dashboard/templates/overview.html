@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% from "_macros.html" import shariah, trend, thesis, pl, level %}
+{% block title %}Overview · Portfolio Desk{% endblock %}
+{% block content %}
+{% set p = d.portfolio %}
+<section>
+  <h1>Overview</h1>
+  <p class="sub">Run of {{ d.run_at | when }}{% if d.fx.date %} · FX {{ d.fx.source }} {{ d.fx.date }} (1 EUR = {{ d.fx.eurusd | num(4) }} USD){% endif %}
+    · Market regime: <strong>{{ (d.macro.regime or 'Unknown') | title }}</strong></p>
+</section>
+
+<section class="kpis" aria-label="Portfolio summary">
+  <div class="kpi"><div class="label">Portfolio value</div><div class="value">{{ p.total_value_eur | eur }}</div></div>
+  <div class="kpi"><div class="label">Unrealised P&amp;L</div>
+    <div class="value {{ 'up' if (p.total_pl_eur or 0) >= 0 else 'down' }}">{{ p.total_pl_eur | eur(True) }}</div></div>
+  <div class="kpi"><div class="label">Return on cost</div>
+    <div class="value">{% if p.total_cost_eur %}{{ pl((p.total_pl_eur / p.total_cost_eur) * 100) }}{% else %}–{% endif %}</div></div>
+  <div class="kpi"><div class="label">Holdings priced</div><div class="value">{{ holdings | selectattr('data_ok') | list | length }}/{{ holdings | length + (p.unpriced | length) }}</div></div>
+  <div class="kpi"><div class="label">Action alerts</div><div class="value">{{ alerts | selectattr('level', 'in', ['DANGER', 'BUY']) | list | length }}</div></div>
+</section>
+
+<div class="grid-2">
+  <section class="panel">
+    <h2>Alerts</h2>
+    {% if alerts %}
+    <ul class="alerts">
+      {% for a in alerts %}
+      <li class="{{ a.level }}">{{ level(a.level) }}
+        <span>{% if a.ticker in d.opportunities | map(attribute='ticker') | list %}<a href="{{ url_for('stock', ticker=a.ticker) }}">{{ a.ticker }}</a>{% else %}{{ a.ticker }}{% endif %}</span>
+        <span class="msg">{{ a.message }}</span></li>
+      {% endfor %}
+    </ul>
+    {% else %}<p class="muted">No alerts this run.</p>{% endif %}
+  </section>
+
+  <div style="display:grid; gap:24px; align-content:start">
+    <section class="panel">
+      <h2>What changed</h2>
+      <ul class="list">{% for c in d.changes %}<li>{{ c }}</li>{% endfor %}</ul>
+    </section>
+    <section class="panel">
+      <h2>Upcoming events</h2>
+      {% if d.macro.events %}
+      <ul class="list">{% for e in d.macro.events[:8] %}<li><span class="muted">{{ e.date }}</span> — {{ e.name }}</li>{% endfor %}</ul>
+      {% else %}<p class="muted">No scheduled events in the next 45 days.</p>{% endif %}
+    </section>
+  </div>
+</div>
+
+<section class="panel">
+  <h2>Top 10 opportunities</h2>
+  <div class="table-wrap">
+    <table class="sortable">
+      <thead><tr>
+        <th data-sort class="num">#</th><th data-sort>Ticker</th><th data-sort>Name</th>
+        <th data-sort class="num">Quality-adj. upside</th><th data-sort>Trend</th><th data-sort>Shariah</th>
+        <th data-sort>AI view</th><th data-sort>Next event</th><th data-sort class="num">Score</th>
+      </tr></thead>
+      <tbody>
+      {% for o in top10 %}
+        <tr>
+          <td class="num">{{ loop.index }}</td>
+          <td><a href="{{ url_for('stock', ticker=o.ticker) }}"><strong>{{ o.ticker }}</strong></a></td>
+          <td>{{ o.name }}</td>
+          <td class="num" data-value="{{ o.adj_upside if o.adj_upside is not none else '' }}">{{ pl(o.adj_upside) }}</td>
+          <td>{{ trend(o.trend) }}</td>
+          <td>{{ shariah(o.shariah) }}</td>
+          <td>{% if o.analysis and o.analysis.status == 'OK' %}{{ o.analysis.new_buyer_action }}{% elif o.analysis %}<span class="muted">insufficient data</span>{% else %}<span class="muted">–</span>{% endif %}</td>
+          <td>{{ o.next_event or '–' }}</td>
+          <td class="num">{{ o.rank_score | num(1) }}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="9" class="muted">No ticker passed the data-quality check this run.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<div class="grid-2">
+  <section class="panel">
+    <h2>Market</h2>
+    {% if d.macro.themes %}<ul class="list">{% for t in d.macro.themes %}<li>{{ t }}</li>{% endfor %}</ul>{% endif %}
+    {% if d.macro.geopolitical_summary %}<p>{{ d.macro.geopolitical_summary }}</p>{% endif %}
+    <dl class="kv">
+      {% for k, v in d.macro.indicators.items() if v is not none %}<dt>{{ k }}</dt><dd>{{ v }}</dd>{% endfor %}
+    </dl>
+    {% for g in d.macro.geo_themes %}
+      <p><span class="chip warn">{{ g.theme }}</span> <a href="{{ g.latest.url }}" rel="noopener" target="_blank">{{ g.latest.title }}</a>
+        <span class="muted">({{ g.latest.date }}{% if g.portfolio_exposed_pct is not none %}, {{ g.portfolio_exposed_pct | pct(False, 0) }} of portfolio exposed{% endif %})</span></p>
+    {% endfor %}
+    {% if not d.macro.themes and not d.macro.geo_themes %}<p class="muted">No macro analysis this run.</p>{% endif %}
+  </section>
+  <section class="panel">
+    <h2>Data health</h2>
+    <div class="table-wrap"><table>
+      <tbody>
+      {% for s in d.sources %}
+        <tr><td>{{ s.name }}</td>
+          <td><span class="chip {{ {'ok':'good','partial':'warn','failed':'bad','skipped':'muted'}.get(s.status, 'muted') }}">{{ s.status }}</span></td>
+          <td class="wrap muted">{{ s.detail }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
+  </section>
+</div>
+{% endblock %}

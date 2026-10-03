@@ -7,3 +7,4 @@ fredapi>=0.5
 requests>=2.31
 trafilatura>=2.0
 lxml>=5.0
+flask>=3.0
