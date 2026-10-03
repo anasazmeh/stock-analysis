@@ -6,6 +6,10 @@
 
 ## 🔴 Immediate — Do These First
 
+### Quick setup
+Run `bash scripts/setup.sh` — it installs the packages, checks Claude Code, and asks for your name/email
+(SEC contact) and the free keys below, saving them to `.env` (private, git-ignored, read automatically).
+
 ### 0. AI analysis — no API key needed
 The Claude stage runs through your logged-in Claude Code (`claude -p`), so it uses your Claude
 subscription instead of a paid API key. Install Claude Code, run `claude` once and log in — that's it.

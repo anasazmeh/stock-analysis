@@ -1,5 +1,21 @@
 import os
 
+
+def _load_dotenv(path: str):
+    """Read KEY=value lines from .env (git-ignored). Real environment variables win."""
+    if not os.path.exists(path):
+        return
+    with open(path) as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+
+
+_load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
+
 # ── API Keys ──────────────────────────────────────────
 ANTHROPIC_API_KEY     = os.environ.get("ANTHROPIC_API_KEY", "")
 FINNHUB_API_KEY       = os.environ.get("FINNHUB_API_KEY", "")

@@ -328,6 +328,18 @@ class IntelligenceTests(unittest.TestCase):
         self.assertIsNone(out["BBB"].sentiment_score)
 
 
+class DotenvTests(unittest.TestCase):
+    def test_env_file_loaded_without_overriding_real_env(self):
+        path = os.path.join(tempfile.mkdtemp(), ".env")
+        with open(path, "w") as f:
+            f.write('# comment\nSEC_TEST_UA="Jane Doe jane@example.com"\nEXISTING_VAR=from_file\n')
+        with mock.patch.dict(os.environ, {"EXISTING_VAR": "from_env"}):
+            config._load_dotenv(path)
+            self.assertEqual(os.environ["SEC_TEST_UA"], "Jane Doe jane@example.com")
+            self.assertEqual(os.environ["EXISTING_VAR"], "from_env")
+        os.environ.pop("SEC_TEST_UA", None)
+
+
 class ClaudeCliTests(unittest.TestCase):
     def test_cli_call_uses_subscription_env_and_schema(self):
         out = json.dumps({"type": "result", "is_error": False, "subtype": "success",

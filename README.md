@@ -7,10 +7,8 @@ Finds and reviews stock opportunities for a Shariah-compliant, EU-based portfoli
 ## Run
 
 ```bash
-pip install -r requirements.txt          # optional FinBERT: pip install -r requirements-ml.txt
-export SEC_USER_AGENT="Your Name you@example.com"
-export FINNHUB_API_KEY=...  FRED_API_KEY=...      # free keys, see TODO.md
-claude                                              # log in once — the AI stage uses your Claude subscription
+bash scripts/setup.sh    # installs packages, checks Claude Code, asks for your SEC contact + free keys → .env
+claude                   # once, if you have never logged in — the AI stage uses your Claude subscription
 python3 main.py
 ```
 
