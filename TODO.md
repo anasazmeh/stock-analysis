@@ -46,22 +46,16 @@ These run automatically (GDELT, SEC filings, Wikipedia index lists, article text
   (`GDELT_MAX_TICKERS` in `config.py`; cached for 4 h).
 
 ### 2. Set Up Daily Automated Alerts
-Put your keys in `.env` (one `KEY=value` per line — git-ignored), then add a cron job:
 ```bash
-crontab -e
-# Weekdays 07:00 — logs go to logs/, exit code 2 marks a degraded run
-0 7 * * 1-5  ~/stock-analysis/scripts/run_daily.sh
+bash scripts/setup_schedule.sh
 ```
-Optional: `HEALTHCHECK_URL` in `.env` (e.g. a healthchecks.io ping URL) tells you when a run fails or never starts.
-
-For email/webhook delivery of alerts, also set:
-```bash
-export ALERT_EMAIL_TO="your@email.com"
-export ALERT_EMAIL_FROM="sender@gmail.com"
-export ALERT_SMTP_PASSWORD="gmail_app_password"
-# or for Slack/Discord:
-export ALERT_WEBHOOK_URL="https://hooks.slack.com/..."
-```
+It asks for the address to email alerts to and a Gmail app password, sends a test email, then installs a
+weekday cron job (default 07:00, your computer's time). It is safe to re-run; `--remove` stops the daily run.
+- Email goes out when a run finds signals, when a run is degraded, and when a run crashes (with the end of the log).
+- Optional `HEALTHCHECK_URL` (a free healthchecks.io check) warns you when a run never starts — e.g. the computer was off.
+- Slack/Discord instead of, or as well as, email: add `ALERT_WEBHOOK_URL="https://hooks.slack.com/..."` to `.env`.
+- Test the channels any time: `python3 -m src.alerts --test`. Logs: `logs/run_YYYY-MM-DD.log`.
+- macOS: cron skips runs while the Mac sleeps.
 
 ### 3. Keep Portfolio Data Current
 - `portfolio_data.py`: update `bep` and `shares` after every trade.

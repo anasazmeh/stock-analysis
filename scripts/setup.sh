@@ -7,7 +7,7 @@ cd "$(dirname "$0")/.."
 echo "== 1/4 Python packages"
 python3 -m pip install -q -r requirements.txt
 read -r -p "Install FinBERT sentiment too? (~1-2 GB download) [y/N] " fb
-if [[ "${fb,,}" == "y" ]]; then python3 -m pip install -q -r requirements-ml.txt; fi
+if [[ "$fb" == [yY]* ]]; then python3 -m pip install -q -r requirements-ml.txt; fi
 
 echo
 echo "== 2/4 Claude Code (used for the AI analysis — no API key, uses your Claude plan)"
@@ -58,4 +58,4 @@ ask_key ALPHA_VANTAGE_API_KEY "https://www.alphavantage.co/support/#api-key" "Al
 echo
 echo "Done. Keys are in .env (private, not committed). Next:"
 echo "  python3 main.py            # full run → reports/"
-echo "  scripts/run_daily.sh       # what cron will run"
+echo "  bash scripts/setup_schedule.sh   # email alerts + daily run"

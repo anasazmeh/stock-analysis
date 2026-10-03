@@ -16,6 +16,7 @@ code=$?
 case $code in
   0) ping "" ;;                                   # success
   2) echo "DEGRADED run (see report)" >>"$log"; ping /fail ;;
-  *) echo "FAILED with exit code $code" >>"$log"; ping /fail ;;
+  *) echo "FAILED with exit code $code" >>"$log"; ping /fail
+     python3 -m src.alerts --notify-failure "$log" "$code" >>"$log" 2>&1 ;;  # email/webhook, if set
 esac
 exit $code

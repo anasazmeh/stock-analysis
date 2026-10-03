@@ -213,3 +213,51 @@ def dispatch_alerts(opportunities: list[Opportunity], macro: MacroContext, healt
     if (alerts or degraded) and config.ALERT_WEBHOOK_URL and _send_webhook(text):
         print("  [alerts] Webhook delivered")
     return alerts, removed
+
+
+def send_test() -> bool:
+    """Send a test message to every configured channel. Returns True if all configured channels worked."""
+    text = f"Test message from the stock-analysis pipeline ({datetime.now():%Y-%m-%d %H:%M}).\n" \
+           f"Alerts will arrive like this after each scheduled run that finds signals.\n\n{DISCLAIMER}"
+    results = []
+    if config.ALERT_EMAIL_TO:
+        ok = _send_email("[Stock Alert] Test message", text)
+        print(f"Email to {config.ALERT_EMAIL_TO}: {'sent' if ok else 'FAILED (check ALERT_* settings in .env)'}")
+        results.append(ok)
+    if config.ALERT_WEBHOOK_URL:
+        ok = _send_webhook(text)
+        print(f"Webhook: {'delivered' if ok else 'FAILED'}")
+        results.append(ok)
+    if not results:
+        print("No alert channel configured (set ALERT_EMAIL_TO/FROM/SMTP_PASSWORD or ALERT_WEBHOOK_URL in .env).")
+    return bool(results) and all(results)
+
+
+def notify_failure(log_path: str, exit_code: int) -> bool:
+    """Tell the configured channels that a scheduled run crashed, with the end of its log."""
+    try:
+        with open(log_path, encoding="utf-8", errors="replace") as f:
+            tail = "".join(f.readlines()[-30:])
+    except OSError:
+        tail = "(log not readable)"
+    tail, _ = scrub(tail)
+    text = f"The scheduled run failed with exit code {exit_code}. No report or alerts were produced.\n" \
+           f"Log: {log_path}\n\n--- last lines ---\n{tail}\n{DISCLAIMER}"
+    sent = _send_email(f"[Stock Alert] Run FAILED — {date.today().isoformat()}", text) if config.ALERT_EMAIL_TO else False
+    if config.ALERT_WEBHOOK_URL:
+        sent = _send_webhook(text) or sent
+    return sent
+
+
+if __name__ == "__main__":
+    import argparse
+    p = argparse.ArgumentParser(description="Alert channel tools")
+    p.add_argument("--test", action="store_true", help="send a test message to the configured channels")
+    p.add_argument("--notify-failure", nargs=2, metavar=("LOG", "EXIT_CODE"), help="report a crashed run")
+    a = p.parse_args()
+    if a.test:
+        sys.exit(0 if send_test() else 1)
+    if a.notify_failure:
+        notify_failure(a.notify_failure[0], int(a.notify_failure[1]))
+    else:
+        p.print_help()

@@ -19,7 +19,9 @@ python3 main.py
 | `python3 main.py --no-cache` | Ignore cached data |
 | `python3 main.py --ipo "SpaceX" --broker-price 162 --amount 2000` | IPO dossier with labelled offer / market / broker prices |
 | `python3 dashboard/app.py` | Web dashboard at http://127.0.0.1:5000 (portfolio, opportunities, stock pages, history, "Refresh data" button) |
-| `scripts/run_daily.sh` | Scheduled run (reads `.env`, logs to `logs/`, optional health-check pings) |
+| `bash scripts/setup_schedule.sh` | Email alerts + weekday cron job (asks, sends a test email, installs; `--remove` to stop) |
+| `scripts/run_daily.sh` | Scheduled run (reads `.env`, logs to `logs/`, emails you if a run crashes, optional health-check pings) |
+| `python3 -m src.alerts --test` | Send a test alert to the configured email / webhook |
 
 Exit codes: `0` ok · `2` degraded data · `1` avoid-list leak or missing required keys.
 
