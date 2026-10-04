@@ -7,16 +7,18 @@ cd "$(dirname "$0")/.."
 mkdir -p logs
 if [ -f .env ]; then set -a; . ./.env; set +a; fi
 
+PY=python3; [ -x .venv/bin/python ] && PY=.venv/bin/python   # created by scripts/setup.sh
+
 ping() { [ -n "${HEALTHCHECK_URL:-}" ] && curl -fsS -m 10 --retry 3 "${HEALTHCHECK_URL}$1" >/dev/null || true; }
 
 log="logs/run_$(date +%Y-%m-%d).log"
 ping /start
-python3 main.py --require-keys >>"$log" 2>&1
+"$PY" main.py --require-keys >>"$log" 2>&1
 code=$?
 case $code in
   0) ping "" ;;                                   # success
   2) echo "DEGRADED run (see report)" >>"$log"; ping /fail ;;
   *) echo "FAILED with exit code $code" >>"$log"; ping /fail
-     python3 -m src.alerts --notify-failure "$log" "$code" >>"$log" 2>&1 ;;  # email/webhook, if set
+     "$PY" -m src.alerts --notify-failure "$log" "$code" >>"$log" 2>&1 ;;  # email/webhook, if set
 esac
 exit $code

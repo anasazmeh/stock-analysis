@@ -6,6 +6,11 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 ROOT="$(pwd)"
 MARK="# stock-analysis-daily"
+PY=python3; [[ -x .venv/bin/python ]] && PY=.venv/bin/python   # created by scripts/setup.sh
+if ! "$PY" -c "import requests" 2>/dev/null; then
+  echo "Python packages are missing. Run 'bash scripts/setup.sh' first."
+  [[ "${1:-}" == "--remove" ]] || exit 1
+fi
 
 remove_cron() { local tab; tab="$( (crontab -l 2>/dev/null || true) | { grep -vF "$MARK" || true; } )"; printf "%s\n" "$tab" | sed "/^$/d" | crontab -; }
 
@@ -62,7 +67,7 @@ fi
 
 if [[ -n "$(current ALERT_EMAIL_TO)" ]]; then
   echo "Sending a test email…"
-  if python3 -m src.alerts --test; then
+  if "$PY" -m src.alerts --test; then
     echo "Check your inbox (and spam folder)."
   else
     echo "The test failed. Re-run this script and check the address and app password."
@@ -79,7 +84,7 @@ if ! [[ "$t" =~ ^([01]?[0-9]|2[0-3]):([0-5][0-9])$ ]]; then echo "Not a valid ti
 hh=$((10#${BASH_REMATCH[1]})); mm=$((10#${BASH_REMATCH[2]}))
 
 # cron starts with a minimal PATH, so pass the one where python3 and claude are found now.
-for tool in python3 claude; do
+for tool in claude; do
   command -v "$tool" >/dev/null 2>&1 || echo "Note: '$tool' is not on your PATH; the scheduled run won't find it either."
 done
 cron_path="${PATH//%/\\%}"; cron_root="${ROOT//%/\\%}"   # % means newline in crontab

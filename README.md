@@ -7,7 +7,8 @@ Finds and reviews stock opportunities for a Shariah-compliant, EU-based portfoli
 ## Run
 
 ```bash
-bash scripts/setup.sh    # installs packages, checks Claude Code, asks for your SEC contact + free keys → .env
+bash scripts/setup.sh    # installs packages into .venv, checks Claude Code, asks for your SEC contact + free keys → .env
+source .venv/bin/activate   # in every new terminal, before the python3 commands
 claude                   # once, if you have never logged in — the AI stage uses your Claude subscription
 python3 main.py
 ```
@@ -18,7 +19,7 @@ python3 main.py
 | `python3 main.py --no-ai` | Skip the Claude analysis |
 | `python3 main.py --no-cache` | Ignore cached data |
 | `python3 main.py --ipo "SpaceX" --broker-price 162 --amount 2000` | IPO dossier with labelled offer / market / broker prices |
-| `python3 dashboard/app.py` | Web dashboard at http://127.0.0.1:5000 (portfolio, opportunities, stock pages, history, "Refresh data" button) |
+| `python3 dashboard/app.py` | Web dashboard at http://127.0.0.1:8050 (portfolio, opportunities, stock pages, history, "Refresh data" button) |
 | `bash scripts/setup_schedule.sh` | Email alerts + weekday cron job (asks, sends a test email, installs; `--remove` to stop) |
 | `scripts/run_daily.sh` | Scheduled run (reads `.env`, logs to `logs/`, emails you if a run crashes, optional health-check pings) |
 | `python3 -m src.alerts --test` | Send a test alert to the configured email / webhook |
