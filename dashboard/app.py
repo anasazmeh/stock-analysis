@@ -5,7 +5,9 @@ Local web dashboard for the stock-analysis pipeline.
 
 Reads reports/latest.json (written by every `python3 main.py` run) and the run
 history in runs/. "Refresh data" starts a pipeline run in the background.
-Binds to 127.0.0.1 only: it is a personal tool, not meant to be exposed.
+Binds to 127.0.0.1 only. For your phone and other devices, use
+scripts/setup_remote.sh: it adds a password (dashboard/auth.py) and serves the
+dashboard through Tailscale with dashboard/serve.py.
 """
 import glob
 import json
@@ -14,7 +16,6 @@ import subprocess
 import sys
 import threading
 from datetime import datetime
-from urllib.parse import urlparse
 
 from flask import Flask, abort, jsonify, render_template, request
 
@@ -24,7 +25,7 @@ sys.path.insert(0, ROOT)
 LEVEL_ORDER = ["DANGER", "BUY", "DIP", "WARN", "INFO"]
 
 
-def create_app(report_dir: str = None, runs_dir: str = None, run_cmd: list = None) -> Flask:
+def create_app(report_dir: str = None, runs_dir: str = None, run_cmd: list = None, auth_options: dict = None) -> Flask:
     import config
     app = Flask(__name__)
     app.config["REPORT_DIR"] = report_dir or config.REPORT_DIR
@@ -63,6 +64,7 @@ def create_app(report_dir: str = None, runs_dir: str = None, run_cmd: list = Non
             "run_at": (data or {}).get("run_at", ""),
             "degraded": (data or {}).get("degraded", False),
             "degraded_reasons": (data or {}).get("degraded_reasons", []),
+            "login_on": app.config.get("REQUIRE_LOGIN", False),
         }
 
     @app.template_filter("eur")
@@ -203,8 +205,8 @@ def create_app(report_dir: str = None, runs_dir: str = None, run_cmd: list = Non
 
     def same_origin() -> bool:
         """Block cross-site POSTs: a web page you visit must not be able to start runs."""
-        source = request.headers.get("Origin") or request.headers.get("Referer")
-        return bool(source) and urlparse(source).netloc == request.host
+        from dashboard.auth import same_origin as check
+        return check()
 
     def run_pipeline():
         log_dir = os.path.join(ROOT, "logs")
@@ -231,6 +233,8 @@ def create_app(report_dir: str = None, runs_dir: str = None, run_cmd: list = Non
         with lock:
             return jsonify(run_state)
 
+    from dashboard import auth
+    auth.install(app, **(auth_options or {}))
     return app
 
 

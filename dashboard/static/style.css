@@ -160,3 +160,15 @@ tbody tr:hover { background: var(--surface-2); }
 .flow { width: 100%; } .flow td:first-child { color: var(--muted); white-space: normal; } .flow td.num { white-space: nowrap; } .flow tr.total td { font-weight: 650; border-top: 2px solid var(--border); color: var(--fg); }
 .level { font-size: 22px; font-weight: 650; }
 .reasoning li { margin: 6px 0; max-width: 75ch; }
+
+/* Login */
+.login-page main { min-height: 80vh; display: grid; place-items: center; }
+.login-box { width: 100%; max-width: 360px; display: grid; gap: 10px; }
+.login-box h1 { margin: 0; }
+.login-box input[type=password] { font: inherit; padding: 10px; border: 1px solid var(--border); border-radius: 6px;
+  background: var(--bg); color: var(--fg); }
+.login-box button { font: inherit; padding: 10px; border: 0; border-radius: 6px; background: var(--accent); color: var(--surface); cursor: pointer; }
+.login-box .remember { font-size: 13px; color: var(--muted); display: flex; gap: 8px; align-items: center; }
+.login-error { margin: 0; padding: 8px 10px; border-radius: 6px; background: var(--bad-soft); color: var(--bad); }
+form.logout { display: inline; margin: 0; }
+button.link { background: none; border: 0; padding: 0 4px; color: var(--muted); font: inherit; cursor: pointer; text-decoration: underline; }

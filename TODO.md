@@ -29,6 +29,7 @@ After the first real run
 - [ ] Add broker-tradable "Watch only" names to `TRADABILITY_OVERRIDES`
 
 Optional
+- [ ] Phone access: install Tailscale on the Mac and phone, then `bash scripts/setup_remote.sh` (add `--public` for a link that opens without the app)
 - [ ] healthchecks.io ping URL (warns when the Mac slept through 12:00)
 - [ ] FinBERT sentiment: `.venv/bin/python -m pip install -r requirements-ml.txt` (~1-2 GB)
 - [ ] Monthly SPUS / HLAL / ISWD holdings CSVs in `data/universe/`
@@ -120,7 +121,9 @@ it appeared in and a suggested fix. Items not seen for 5 runs move to *Resolved*
 - [ ] **yfinance is an unofficial Yahoo API** — it breaks every few months; the Finnhub price cross-check is the
       safety net, keep the key set
 - [ ] **Broker CSV import** column names are guessed from DEGIRO / Revolut docs — check against your real exports
-- [ ] **Dashboard uses Flask's development server** — fine on 127.0.0.1, never expose it to a network
+- [ ] **Remote access depends on the Mac being on** — a laptop with the lid closed sleeps; a small always-on machine
+      (old Mac mini, Raspberry Pi) or a cloud host would make the portal available 24/7
+- [ ] **Login is a single password** — add a second factor (TOTP) if you use the public link
 - [ ] **Cash balance is typed in by hand** — import it from the DEGIRO "Account" CSV / Revolut statement
 - [ ] **Cash plan market signals**: optional breadth (share of S&P 500 above its 200-day average) and AAII sentiment
       would sharpen the risk level — free sources, not connected yet
