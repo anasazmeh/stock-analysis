@@ -331,12 +331,34 @@ DEFAULT_THESIS_RULES = {
 EARNINGS_LOOKUP_MAX     = 40   # Yahoo calendar lookups per run (holdings first)
 EARNINGS_BLACKOUT_DAYS  = 5    # no new BUY/ADD signal within this many trading days of earnings
 # Scheduled macro events — extend each year from the Fed, ECB and BLS calendars.
+# Sources: Fed press release 2025-09-05 (federalreserve.gov), ECB Governing Council calendar
+# (ecb.europa.eu), BLS CPI schedule (bls.gov). BLS publishes 2027 CPI dates in late 2026 — add them
+# then; Data Health warns when this list has nothing left in the next 90 days.
 MACRO_EVENTS = [
     {"date": "2026-10-14", "name": "US CPI (September)", "themes": ["All"]},
     {"date": "2026-10-28", "name": "FOMC decision (27-28 Oct)", "themes": ["All"]},
     {"date": "2026-10-29", "name": "ECB rate decision", "themes": ["All"]},
+    {"date": "2026-11-10", "name": "US CPI (October)", "themes": ["All"]},
     {"date": "2026-12-09", "name": "FOMC decision (8-9 Dec)", "themes": ["All"]},
+    {"date": "2026-12-10", "name": "US CPI (November)", "themes": ["All"]},
     {"date": "2026-12-17", "name": "ECB rate decision", "themes": ["All"]},
+    # 2027 — FOMC decisions on the second meeting day, ECB decisions on the Thursday
+    {"date": "2027-01-27", "name": "FOMC decision (26-27 Jan)", "themes": ["All"]},
+    {"date": "2027-02-04", "name": "ECB rate decision", "themes": ["All"]},
+    {"date": "2027-03-17", "name": "FOMC decision (16-17 Mar)", "themes": ["All"]},
+    {"date": "2027-03-18", "name": "ECB rate decision", "themes": ["All"]},
+    {"date": "2027-04-28", "name": "FOMC decision (27-28 Apr)", "themes": ["All"]},
+    {"date": "2027-04-29", "name": "ECB rate decision", "themes": ["All"]},
+    {"date": "2027-06-09", "name": "FOMC decision (8-9 Jun)", "themes": ["All"]},
+    {"date": "2027-06-10", "name": "ECB rate decision", "themes": ["All"]},
+    {"date": "2027-07-22", "name": "ECB rate decision", "themes": ["All"]},
+    {"date": "2027-07-28", "name": "FOMC decision (27-28 Jul)", "themes": ["All"]},
+    {"date": "2027-09-09", "name": "ECB rate decision", "themes": ["All"]},
+    {"date": "2027-09-15", "name": "FOMC decision (14-15 Sep)", "themes": ["All"]},
+    {"date": "2027-10-27", "name": "FOMC decision (26-27 Oct)", "themes": ["All"]},
+    {"date": "2027-10-28", "name": "ECB rate decision", "themes": ["All"]},
+    {"date": "2027-12-08", "name": "FOMC decision (7-8 Dec)", "themes": ["All"]},
+    {"date": "2027-12-16", "name": "ECB rate decision", "themes": ["All"]},
 ]
 
 # ── Argaam (undocumented endpoint — opt in only if your use is permitted) ──

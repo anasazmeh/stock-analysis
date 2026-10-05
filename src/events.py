@@ -104,6 +104,22 @@ def tsmc_revenue_dates(today: date, months: int = 2) -> list[dict]:
     return out[:months]
 
 
+def calendar_status(today: date = None, warn_days: int = 90) -> tuple[str, str]:
+    """(status, detail) for Data Health: warn before config.MACRO_EVENTS runs out."""
+    today = today or date.today()
+    upcoming = sorted(e["date"] for e in config.MACRO_EVENTS if e["date"] >= today.isoformat())
+    if not upcoming:
+        return "failed", "no macro events left — add the next Fed / ECB / CPI dates to MACRO_EVENTS in config.py"
+    last = upcoming[-1]
+    if last < (today + timedelta(days=warn_days)).isoformat():
+        return "partial", f"MACRO_EVENTS ends {last} — add the next dates to config.py"
+    cpi = [d for d in upcoming if d <= (today + timedelta(days=warn_days)).isoformat()]
+    has_cpi = any(e["date"] in cpi and "CPI" in e["name"] for e in config.MACRO_EVENTS)
+    return ("ok" if has_cpi else "partial",
+            f"{len(upcoming)} upcoming, last {last}" + ("" if has_cpi else
+            " — no US CPI date in the next 90 days (BLS publishes the next year's dates in late autumn)"))
+
+
 def macro_events(today: date, horizon_days: int = 45) -> list[dict]:
     end = (today + timedelta(days=horizon_days)).isoformat()
     events = [e for e in config.MACRO_EVENTS + tsmc_revenue_dates(today) + load_user_events()

@@ -40,6 +40,8 @@ Logs: every run started from a terminal is saved to `logs/run_YYYY-MM-DD_HHMMSS.
 
 Technical debt: each run merges its warnings and errors into [`TECH_DEBT.md`](TECH_DEBT.md), grouped by cause with a suggested fix (`python3 -m src.tech_debt --scan logs/` imports older logs).
 
+Tests: `python3 -m unittest discover tests` — GitHub runs them automatically on every push and pull request (`.github/workflows/tests.yml`).
+
 Exit codes: `0` ok · `2` degraded data · `1` avoid-list leak or missing required keys.
 
 ## Your investor profile
