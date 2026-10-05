@@ -53,6 +53,7 @@ class MacroContext:
     cpi_yoy: Optional[float] = None
     unemployment: Optional[float] = None
     eurusd: Optional[float] = None
+    hy_spread: Optional[float] = None     # ICE BofA US high-yield option-adjusted spread, % (FRED)
     geopolitical_summary: str = ""
     macro_news: list = field(default_factory=list)
     events: list = field(default_factory=list)        # upcoming macro events {date, name}

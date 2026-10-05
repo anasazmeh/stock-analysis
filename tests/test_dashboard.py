@@ -15,6 +15,7 @@ config.CACHE_DIR = tempfile.mkdtemp()
 from dashboard.app import create_app  # noqa: E402
 from src import dashboard_data, portfolio  # noqa: E402
 from src.sell_review import apply_exit_metrics, review_holdings  # noqa: E402
+from src.cash_plan import build_cash_plan  # noqa: E402
 from src.data_quality import RunHealth  # noqa: E402
 from src.fx import parse_ecb_xml  # noqa: E402
 from src.models import (Opportunity, PortfolioHolding, ShariahStatus, RiskProfile, AnalysisResult,  # noqa: E402
@@ -61,11 +62,13 @@ def sample_payload():
     exp = portfolio.exposure(opps)
     apply_exit_metrics(opps)
     sell_rows = review_holdings(opps, FX)
+    opps[2].analysis.new_buyer_action = "BUY"   # MU: an idea for the cash plan
     top10 = [o for o in opps if o.data_ok]
     macro = MacroContext(regime="neutral", themes=["AI capex", "Rates on hold"], vix=17.2, eurusd=1.15,
                          events=[{"date": "2026-10-28", "name": "FOMC decision"}],
                          geo_themes=[{"theme": "US chip export controls", "documents": 1, "portfolio_exposed_pct": 41.0,
                                       "latest": {"title": "Export controls update", "date": "2026-09-25", "url": "https://example.com"}}])
+    plan = build_cash_plan(opps, sell_rows, macro, {"SPY": [100 + i * 0.1 for i in range(260)]}, FX, exp)
     health = RunHealth()
     health.record("Yahoo Finance", "ok", "4/4 priced")
     health.record("Finnhub price check", "skipped", "no key")
@@ -80,7 +83,7 @@ def sample_payload():
                                                                     "amount": 0.01, "amount_eur": 0.01})],
         broker_diffs=None, scorecard={"since": "2026-09-01", "portfolio_pct": 4.0, "benchmark_pct": 2.5,
                                       "benchmark": "ISWD.L", "difference_pts": 1.5},
-        sell_rows=sell_rows,
+        sell_rows=sell_rows, cash_plan=plan,
         now=datetime(2026, 10, 3, 7, 0))
 
 
@@ -100,7 +103,7 @@ class DashboardTests(unittest.TestCase):
         for path, needle in [("/", "Top 10 opportunities"), ("/portfolio", "iShares Nasdaq-100"),
                              ("/opportunities", "Regional heatmap"), ("/stock/NVDA", "NVIDIA example thesis"),
                              ("/history", "Portfolio vs MSCI World Islamic"),
-                             ("/sell", "Trim to cap")]:
+                             ("/sell", "Trim to cap"), ("/cash", "Where the money goes")]:
             r = self.client.get(path)
             self.assertEqual(r.status_code, 200, path)
             self.assertIn(needle, r.get_data(as_text=True), path)
@@ -118,6 +121,14 @@ class DashboardTests(unittest.TestCase):
         data = self.client.get("/api/latest").get_json()
         nvda = next(r for r in data["sell_review"] if r["ticker"] == "NVDA")
         self.assertEqual(nvda["category"], "Trim to cap")
+
+    def test_cash_plan_page(self):
+        html = self.client.get("/cash").get_data(as_text=True)
+        self.assertIn("Why this split", html)
+        self.assertIn("To make this decision firmer", html)
+        data = self.client.get("/api/latest").get_json()
+        s = data["cash_plan"]["scenarios"][0]
+        self.assertAlmostEqual(s["keep_eur"] + s["invest_eur"] + s["unallocated_eur"], s["available_eur"], places=2)
 
     def test_unknown_stock_404(self):
         self.assertEqual(self.client.get("/stock/ZZZZ").status_code, 404)

@@ -17,6 +17,7 @@
       <a href="{{ url_for('portfolio') }}" class="{{ 'active' if ep == 'portfolio' }}">Portfolio</a>
       <a href="{{ url_for('opportunities') }}" class="{{ 'active' if ep in ('opportunities', 'stock') }}">Opportunities</a>
       <a href="{{ url_for('sell') }}" class="{{ 'active' if ep == 'sell' }}">Sell review{% if nav_sell_count %}<span class="badge" title="Strong sell signals">{{ nav_sell_count }}</span>{% endif %}</a>
+      <a href="{{ url_for('cash') }}" class="{{ 'active' if ep == 'cash' }}">Cash plan</a>
       <a href="{{ url_for('history') }}" class="{{ 'active' if ep == 'history' }}">History</a>
     </nav>
     <div class="runinfo">

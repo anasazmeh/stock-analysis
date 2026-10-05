@@ -126,10 +126,10 @@ def _fetch_rss_news(query: str, limit: int = 5, when: str = "") -> list[dict]:
 
 
 def _fetch_fred_indicators() -> dict:
-    """Fed funds, CPI YoY, unemployment, 10Y-2Y, VIX, EUR/USD (needs FRED_API_KEY)."""
+    """Fed funds, CPI YoY, unemployment, 10Y-2Y, VIX, EUR/USD, high-yield spread (needs FRED_API_KEY)."""
     if not config.FRED_API_KEY:
         return {}
-    cached = cache.get("macro:fred:v2", config.TTL_FRED)
+    cached = cache.get("macro:fred:v3", config.TTL_FRED)
     if cached:
         return cached
     out = {}
@@ -138,7 +138,8 @@ def _fetch_fred_indicators() -> dict:
         fred = Fred(api_key=config.FRED_API_KEY)
         start = (date.today() - timedelta(days=500)).isoformat()
         for key, series_id in {"fed_rate": "FEDFUNDS", "unemployment": "UNRATE",
-                               "t10y2y": "T10Y2Y", "vix": "VIXCLS", "eurusd": "DEXUSEU"}.items():
+                               "t10y2y": "T10Y2Y", "vix": "VIXCLS", "eurusd": "DEXUSEU",
+                               "hy_spread": "BAMLH0A0HYM2"}.items():   # US high-yield credit spread, %
             try:
                 s = fred.get_series(series_id, observation_start=start).dropna()
                 if not s.empty:
@@ -155,7 +156,7 @@ def _fetch_fred_indicators() -> dict:
         print(f"  [news] FRED fetch failed: {type(e).__name__}")
         return {}
     if out:
-        cache.set("macro:fred:v2", out)
+        cache.set("macro:fred:v3", out)
     return out
 
 
@@ -273,5 +274,6 @@ def build_macro_context() -> MacroContext:
         cpi_yoy=fred.get("cpi_yoy"),
         unemployment=fred.get("unemployment"),
         eurusd=fred.get("eurusd"),
+        hy_spread=fred.get("hy_spread"),
         macro_news=macro_news,
     )

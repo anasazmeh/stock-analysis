@@ -141,6 +141,19 @@ def create_app(report_dir: str = None, runs_dir: str = None, run_cmd: list = Non
                                holds=[r for r in rows if r["category"] == "Hold"],
                                unpriced=data["portfolio"].get("unpriced") or [])
 
+    @app.route("/cash")
+    def cash():
+        data = load_latest()
+        if not data:
+            return empty()
+        return render_template("cash.html", d=data, plan=data.get("cash_plan"))
+
+    @app.template_filter("md_bold")
+    def md_bold(text):
+        from markupsafe import Markup, escape
+        parts = str(escape(text or "")).split("**")
+        return Markup("".join(f"<strong>{p}</strong>" if i % 2 else p for i, p in enumerate(parts)))
+
     @app.route("/opportunities")
     def opportunities():
         data = load_latest()

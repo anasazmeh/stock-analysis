@@ -113,6 +113,7 @@ def main() -> int:
     from src.alerts import dispatch_alerts
     from src.dashboard_data import build_payload, write_latest
     from src.sell_review import apply_exit_metrics, review_holdings
+    from src.cash_plan import build_cash_plan
 
     # ── 0. Broker reconciliation ─────────────────────────────────────────
     broker_diffs = run_reconciliation(HOLDINGS)
@@ -237,10 +238,11 @@ def main() -> int:
     changes = what_changed(opportunities, ranked_now[:10], previous)
     unpriced = unpriced_holdings(opportunities)
     sell_rows = review_holdings(opportunities, fx, broker_diffs)
+    cash_plan = build_cash_plan(opportunities, sell_rows, macro, benchmarks, fx, exposure)
     report, top10 = generate_report(opportunities, macro, health=HEALTH, fx=fx, exposure=exposure,
                                     unpriced=unpriced, changes=changes,
                                     purification_rows=pur, broker_diffs=broker_diffs, scorecard=card,
-                                    av_stats=av_stats, sell_rows=sell_rows)
+                                    av_stats=av_stats, sell_rows=sell_rows, cash_plan=cash_plan)
     report, removed = scrub(report)
     path = save_report(report)
     write_snapshot(opportunities, top10, HEALTH, prompt_digest,
@@ -250,7 +252,7 @@ def main() -> int:
     _, removed_dash = write_latest(build_payload(
         opportunities, macro, health=HEALTH, fx=fx, exposure=exposure, unpriced=unpriced, top10=top10,
         alerts=alerts, changes=changes, purification_rows=pur, broker_diffs=broker_diffs, scorecard=card,
-        sell_rows=sell_rows))
+        sell_rows=sell_rows, cash_plan=cash_plan))
     removed_alerts += removed_dash
 
     print(f"\n{'=' * 60}\n  ✅ Report: {path}\n{'=' * 60}\n")

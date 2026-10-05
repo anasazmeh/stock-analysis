@@ -34,3 +34,11 @@ HOLDINGS = [
     {"ticker": "", "name": "WisdomTree Physical Gold ETC",   "shares": 5,  "bep": 479.00, "bep_currency": "USD", "status": "🟢 HOLD", "asset_type": "ETC", "themes": ["Precious metals"], "shariah_note": "Gold ETC — permissible only if it meets AAOIFI Shariah Standard 57 (allocated, physically backed, no interest). Check the issuer's prospectus."},
     {"ticker": "", "name": "WisdomTree Physical Silver ETC", "shares": 26, "bep": 61.59,  "bep_currency": "EUR", "status": "🟢 HOLD", "asset_type": "ETC", "themes": ["Precious metals"], "shariah_note": "Silver ETC — same AAOIFI SS-57 conditions as gold. Check the issuer's prospectus."},
 ]
+
+# Cash you hold at each broker, in EUR (update when it changes). Used by the Cash plan tab:
+# the reserve it recommends counts this cash first, before any sale proceeds.
+CASH_EUR = {"DEGIRO": 0.0, "Revolut": 0.0}
+
+# Money you will need from the portfolio within 12 months (tuition, a car, ...). Always kept as cash.
+# Your emergency fund should sit outside the portfolio and is not counted here.
+PLANNED_WITHDRAWALS_EUR = 0.0

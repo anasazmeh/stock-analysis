@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% from "_macros.html" import shariah %}
+{% block title %}Cash plan · Portfolio Desk{% endblock %}
+{% set LEVEL_CHIP = {'Calm': 'good', 'Normal': 'muted', 'Elevated': 'warn', 'Stressed': 'bad'} %}
+
+{% macro scenario(s, idx) %}
+<div class="scenario" data-scenario="{{ idx }}" {% if idx %}hidden{% endif %}>
+  <section class="kpis">
+    <div class="kpi"><div class="label">Cash available</div><div class="value">{{ s.available_eur | eur }}</div>
+      <div class="muted">sales {{ s.net_proceeds_eur | eur }} + cash {{ s.existing_cash_eur | eur }}</div></div>
+    <div class="kpi"><div class="label">Keep as cash</div><div class="value">{{ s.keep_eur | eur }}</div>
+      <div class="muted">{{ s.target_cash_pct | num(0) }}% reserve{% if s.tax_reserve_eur %} + tax{% endif %}{% if s.planned_withdrawals_eur %} + planned{% endif %}</div></div>
+    <div class="kpi"><div class="label">Invest</div><div class="value">{{ s.invest_eur | eur }}</div>
+      <div class="muted">in {{ s.buys | length }} idea(s)</div></div>
+    <div class="kpi"><div class="label">Cash after the plan</div><div class="value">{{ s.cash_end_eur | eur }}</div>
+      <div class="muted">{{ s.cash_end_pct | pct(False) }} of {{ s.portfolio_after_eur | eur }}</div></div>
+  </section>
+
+  {% set total = s.available_eur if s.available_eur and s.available_eur > 0 else 1 %}
+  <section class="panel">
+    <h2>Where the money goes</h2>
+    {% if s.available_eur and s.available_eur > 0 %}
+    {% set base_keep = s.keep_eur - s.tax_reserve_eur if s.keep_eur > s.tax_reserve_eur else 0 %}
+    <div class="splitbar" role="img" aria-label="Split of available cash">
+      {% if base_keep > 0 %}<span class="keep" style="flex: {{ base_keep / total }}" title="Reserve {{ base_keep | eur }}">{% if base_keep / total > 0.08 %}Keep {{ (base_keep / total * 100) | round | int }}%{% endif %}</span>{% endif %}
+      {% if s.tax_reserve_eur > 0 %}<span class="tax" style="flex: {{ s.tax_reserve_eur / total }}" title="Tax {{ s.tax_reserve_eur | eur }}">{% if s.tax_reserve_eur / total > 0.06 %}Tax{% endif %}</span>{% endif %}
+      {% for b in s.buys %}<span class="buy" style="flex: {{ b.eur / total }}" title="{{ b.ticker }} {{ b.eur | eur }}">{% if b.eur / total > 0.06 %}{{ b.ticker }}{% endif %}</span>{% endfor %}
+      {% if s.unallocated_eur > 1 %}<span class="left" style="flex: {{ s.unallocated_eur / total }}" title="Not placed {{ s.unallocated_eur | eur }}">{% if s.unallocated_eur / total > 0.06 %}Cash{% endif %}</span>{% endif %}
+    </div>
+    <div class="legend">
+      <span><i style="background: var(--muted)"></i>Reserve{% if s.planned_withdrawals_eur %} + planned withdrawals{% endif %}</span>
+      {% if s.tax_reserve_eur %}<span><i style="background: var(--warn)"></i>Tax on gains</span>{% endif %}
+      <span><i style="background: var(--accent)"></i>Buys</span>
+      <span><i style="background: var(--info)"></i>No qualifying idea — stays cash</span>
+    </div>
+    {% else %}<p class="muted">No cash from sales or balances in this scenario.</p>{% endif %}
+
+    <div class="grid-2" style="margin-top:16px">
+      <div class="table-wrap"><table class="flow">
+        <tbody>
+          <tr><td>Sale proceeds ({{ s.sales | length }} sale{{ 's' if s.sales | length != 1 }})</td><td class="num">{{ s.proceeds_eur | eur }}</td></tr>
+          <tr><td>− fees on sales</td><td class="num">{{ s.sell_fees_eur | eur }}</td></tr>
+          <tr><td>+ cash you already hold</td><td class="num">{{ s.existing_cash_eur | eur }}</td></tr>
+          <tr class="total"><td>= Available</td><td class="num">{{ s.available_eur | eur }}</td></tr>
+          <tr><td>Keep: {{ s.target_cash_pct | num(0) }}% reserve</td><td class="num">{{ s.reserve_eur | eur }}</td></tr>
+          {% if s.planned_withdrawals_eur %}<tr><td>Keep: planned withdrawals</td><td class="num">{{ s.planned_withdrawals_eur | eur }}</td></tr>{% endif %}
+          <tr><td class="wrap">Keep: tax on gains ({{ (s.tax_rate * 100) | num(1) }}%{% if "unknown" in s.tax_rate_source %}, rate not set{% endif %})</td><td class="num">{{ s.tax_reserve_eur | eur }}</td></tr>
+          <tr class="total"><td>Invest</td><td class="num">{{ s.invest_eur | eur }}</td></tr>
+          <tr><td>Not placed, stays cash</td><td class="num">{{ s.unallocated_eur | eur }}</td></tr>
+        </tbody>
+      </table></div>
+      <div>
+        <h3 style="margin:0 0 6px;font-size:14px">Sales in this scenario</h3>
+        {% if s.sales %}<ul class="list">{% for x in s.sales %}<li><a href="{{ url_for('stock', ticker=x.ticker) }}"><strong>{{ x.ticker }}</strong></a>
+          — {{ x.action | lower }} · {{ x.proceeds_eur | eur }}{% if x.realised_pl_eur is not none %}, realises {{ x.realised_pl_eur | eur(True) }}{% endif %}</li>{% endfor %}</ul>
+        {% else %}<p class="muted">None — see the <a href="{{ url_for('sell') }}">Sell review</a>.</p>{% endif %}
+      </div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Buys</h2>
+    {% if s.buys %}
+    <div class="table-wrap"><table class="sortable">
+      <thead><tr><th data-sort>Ticker</th><th data-sort class="num">Shares</th><th data-sort class="num">≈ EUR</th><th data-sort class="num">Share</th>
+        <th data-sort class="num">Weight after</th><th data-sort>Shariah</th><th>When</th><th class="wrap">Why</th></tr></thead>
+      <tbody>{% for b in s.buys %}
+        <tr><td><a href="{{ url_for('stock', ticker=b.ticker) }}"><strong>{{ b.ticker }}</strong></a>{% if b.held %} <span class="chip info">add</span>{% endif %}<br><span class="muted">{{ b.name }}</span></td>
+          <td class="num">{{ b.units | num(0 if b.units == (b.units | int) else 2) }}</td>
+          <td class="num" data-value="{{ b.eur }}">{{ b.eur | eur }}<br><span class="muted">at {{ b.price | num }} {{ b.currency }}</span></td>
+          <td class="num" data-value="{{ b.share_pct }}">{{ b.share_pct | pct(False, 0) }}</td>
+          <td class="num">{{ b.weight_after_pct | pct(False) }}</td>
+          <td>{{ shariah({'compliant': b.shariah}) }}</td>
+          <td>{% for t in b.tranches %}{{ t.pct }}% {{ t.when }}{% if not loop.last %}<br>{% endif %}{% endfor %}</td>
+          <td class="wrap">{{ b.reasons | join(' · ') }}</td></tr>
+      {% endfor %}</tbody>
+    </table></div>
+    <p class="muted">Amounts include an estimated {{ s.buys | sum(attribute='fee_eur') | eur }} in fees. Use limit orders; prices are from this run.</p>
+    {% else %}<p>Nothing to buy in this scenario — the money stays in cash.</p>{% endif %}
+    {% if s.near_misses %}
+      <h3 style="margin:16px 0 6px;font-size:14px">Close, but not yet</h3>
+      <ul class="list">{% for m in s.near_misses %}<li><a href="{{ url_for('stock', ticker=m.ticker) }}">{{ m.ticker }}</a> — {{ m.why_not | join(', ') }}</li>{% endfor %}</ul>
+    {% endif %}
+  </section>
+</div>
+{% endmacro %}
+
+{% block content %}
+<section>
+  <h1>Cash plan</h1>
+  <p class="sub">What to do with the money your sales would free: how much to keep as cash and how much to put into which opportunities, and why.</p>
+</section>
+
+{% if not plan %}
+<section class="panel"><p>This run has no cash plan yet. Run <code>python3 main.py</code> again to create one.</p></section>
+{% else %}
+{% set m = plan.market %}
+<section class="panel" style="display:flex;flex-wrap:wrap;gap:12px 24px;align-items:center;justify-content:space-between">
+  <div class="seg-toggle" role="group" aria-label="Scenario">
+    {% for s in plan.scenarios %}<button type="button" id="sc-{{ loop.index0 }}" data-show="{{ loop.index0 }}" aria-pressed="{{ 'true' if loop.first else 'false' }}">{{ s.name }}</button>{% endfor %}
+  </div>
+  <div>Market risk <span class="chip {{ LEVEL_CHIP.get(m.level, 'muted') }}">{{ m.level }}</span> <span class="muted">{{ m.coverage }}</span></div>
+</section>
+
+{% for s in plan.scenarios %}{{ scenario(s, loop.index0) }}{% endfor %}
+
+<div class="grid-2">
+  <section class="panel">
+    <h2>Why this split</h2>
+    {% for s in plan.scenarios %}<ul class="list reasoning scenario" data-scenario="{{ loop.index0 }}" {% if not loop.first %}hidden{% endif %}>{% for r in (s.reasoning or plan.reasoning) %}<li>{{ r | md_bold }}</li>{% endfor %}</ul>{% endfor %}
+    <p class="muted">{{ plan.shariah_cash_note }}</p>
+  </section>
+  <section class="panel">
+    <h2>Market risk: {{ m.level }}</h2>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Signal</th><th class="num">Now</th><th>Reading</th><th class="num">Points</th></tr></thead>
+      <tbody>{% for x in m.signals %}<tr><td>{{ x.name }}</td><td class="num">{{ x.value }}</td><td>{{ x.reading }}</td><td class="num">{{ x.points }}</td></tr>{% endfor %}
+        <tr class="total"><td colspan="3">Total (0–1 calm · 2–3 normal · 4–5 elevated · 6+ stressed)</td><td class="num">{{ m.points }}</td></tr></tbody>
+    </table></div>
+    {% if m.missing %}<p class="muted">Not available this run: {{ m.missing | join(', ') }}.</p>{% endif %}
+    {% if m.events_soon %}<p>Coming up: {% for e in m.events_soon %}{{ e.name }} ({{ e.date }}){{ ', ' if not loop.last }}{% endfor %}.</p>{% endif %}
+    {% if plan.sector_weights %}
+      <h3 style="margin:16px 0 6px;font-size:14px">Your sectors today</h3>
+      <p>{% for k, v in plan.sector_weights.items() %}{{ k }} {{ v | num(0) }}%{{ ' · ' if not loop.last }}{% endfor %}</p>
+    {% endif %}
+  </section>
+</div>
+
+<section class="panel">
+  <h2>To make this decision firmer</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Missing</th><th class="wrap">Why it matters</th><th class="wrap">How to add it</th></tr></thead>
+    <tbody>{% for g in plan.data_gaps %}<tr><td><strong>{{ g.what }}</strong></td><td class="wrap">{{ g.why }}</td><td class="wrap">{{ g.how }}</td></tr>{% endfor %}</tbody>
+  </table></div>
+</section>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.querySelectorAll(".seg-toggle button").forEach(function (btn) {
+  btn.addEventListener("click", function () {
+    document.querySelectorAll(".seg-toggle button").forEach(b => b.setAttribute("aria-pressed", b === btn ? "true" : "false"));
+    document.querySelectorAll(".scenario").forEach(el => { el.hidden = el.dataset.scenario !== btn.dataset.show; });
+  });
+});
+</script>
+{% endblock %}
