@@ -42,6 +42,15 @@ Technical debt: each run merges its warnings and errors into [`TECH_DEBT.md`](TE
 
 Exit codes: `0` ok · `2` degraded data · `1` avoid-list leak or missing required keys.
 
+## Your investor profile
+`INVESTOR_PROFILE` in `config.py` (now: **+100% in 12 months, single-stock drops up to 50% accepted, at most 20% per stock**):
+- Ranking switches to `RANK_WEIGHTS_GROWTH` — upside 30%, revenue/earnings growth 25%, trend 20%, sentiment 15%, steadiness 10%.
+- Claude is told the goal and rates buy / watch / avoid against it, with one sentence on how each stock could (not) contribute.
+- A **Goal fit** column (Strong / Possible / Unlikely) on Opportunities and each stock page: analyst upside vs the goal, revenue growth, and a warning when a stock fell more than your accepted drop.
+- Sell rules widen: stop-loss at −35% (0.7 × the accepted drop), take profit at the goal (+100%), trailing stop up to 40%.
+- The Cash plan uses the 20% position limit and asks 30% upside when Claude is off.
+Set `"enabled": False` to go back to the balanced defaults.
+
 ## Pipeline
 
 1. **Discovery** — watchlist + holdings, S&P 500 / Nasdaq-100 and Shariah ETF momentum picks, regional screens (Saudi, UAE, DE, NL, FR).

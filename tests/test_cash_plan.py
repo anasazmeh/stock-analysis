@@ -59,8 +59,23 @@ class MarketTests(unittest.TestCase):
         self.assertEqual(m["events_soon"][0]["days"], 2)
 
 
+
+BALANCED = {"POSITION_CAP_PCT": 12.0, "SELL_TAKE_PROFIT_PCT": 50.0, "SELL_STOP_LOSS_PCT": -20.0,
+            "REINVEST_MIN_UPSIDE": 15.0, "TRAIL_STOP_MAX_PCT": 30.0}
+
+
+def balanced(test):
+    """Run a test with the balanced (no investor profile) settings these numbers were written for."""
+    from unittest import mock
+    patches = [mock.patch.object(config, k, v) for k, v in BALANCED.items()]
+    for p in patches:
+        p.start()
+    test.addCleanup(lambda: [p.stop() for p in patches])
+
+
 class PlanTests(unittest.TestCase):
     def setUp(self):
+        balanced(self)
         self.p = [mock.patch.object(cash_plan, "cash_balances", return_value={"DEGIRO": 0.0}),
                   mock.patch.object(cash_plan, "planned_withdrawals", return_value=0.0),
                   mock.patch.object(config, "CAPITAL_GAINS_TAX_RATE", 0.0)]

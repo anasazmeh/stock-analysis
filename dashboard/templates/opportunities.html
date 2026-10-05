@@ -5,7 +5,8 @@
 <section>
   <h1>Opportunities</h1>
   <p class="sub">Ranked by {% for k, v in d.rank_weights.items() if v %}{{ k | replace('_', ' ') }} {{ (v * 100) | round | int }}%{{ ', ' if not loop.last }}{% endfor %}.
-    Missing data lowers a score; tickers with data gaps are not ranked. Shariah ({{ d.shariah_methodology }}) is a label, not a filter.</p>
+    Missing data lowers a score; tickers with data gaps are not ranked. Shariah ({{ d.shariah_methodology }}) is a label, not a filter.
+    {% set ip = d.investor_profile %}{% if ip and ip.enabled %}<br>Your goal: <strong>+{{ ip.target_return_pct | num(0) }}% in {{ ip.horizon_months }} months</strong>, drops up to {{ ip.max_drawdown_pct | num(0) }}% accepted — "Goal fit" shows how plausibly each stock helps.{% endif %}</p>
 </section>
 
 <section class="panel">
@@ -45,7 +46,7 @@
         <th data-sort class="num">Score</th><th data-sort>Ticker</th><th data-sort>Name</th><th data-sort>Region</th>
         <th data-sort class="num">Price</th><th data-sort>Check</th><th data-sort class="num">Upside</th><th data-sort class="num">Quality-adj.</th>
         <th data-sort class="num">Analysts</th><th data-sort>Trend</th><th data-sort class="num">Risk</th><th data-sort>Shariah</th>
-        <th data-sort>AI view</th><th data-sort>Cash plan</th><th data-sort>Next event</th><th data-sort>Notes</th>
+        <th data-sort>AI view</th>{% if d.investor_profile and d.investor_profile.enabled %}<th data-sort>Goal fit</th>{% endif %}<th data-sort>Cash plan</th><th data-sort>Next event</th><th data-sort>Notes</th>
       </tr></thead>
       <tbody>
       {% for o in rows %}
@@ -65,6 +66,8 @@
           <td class="num" data-value="{{ (o.risk or {}).get('composite_score') or '' }}">{{ (o.risk or {}).get('composite_score') | num(1) }}</td>
           <td>{{ shariah(o.shariah) }}</td>
           <td>{% if o.analysis and o.analysis.status == 'OK' %}{{ o.analysis.new_buyer_action }}{% else %}<span class="muted">–</span>{% endif %}</td>
+          {% if d.investor_profile and d.investor_profile.enabled %}{% set gf = o.goal_fit or {} %}
+          <td><span class="chip {{ {'Strong': 'good', 'Possible': 'warn', 'Unlikely': 'muted'}.get(gf.level, 'muted') }}" title="{{ (gf.notes or []) | join('; ') }}">{{ gf.level or '–' }}</span></td>{% endif %}
           {% set ps = plan_status.get(o.ticker) %}
           <td>{% if ps and ps.outcome == 'buy' %}<a href="{{ url_for('cash') }}" class="chip good">buy {{ ps.eur | eur }}</a>{% elif ps %}<a href="{{ url_for('cash') }}" class="chip {{ 'warn' if ps.outcome == 'wait' else 'muted' }}" title="{{ ps.why | join('; ') }}">{{ 'not this time' if ps.outcome == 'wait' else 'skip' }}</a>{% else %}<span class="muted">–</span>{% endif %}</td>
           <td>{{ o.next_event or '–' }}</td>

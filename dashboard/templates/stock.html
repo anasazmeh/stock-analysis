@@ -18,6 +18,8 @@
     <div class="muted">{{ o.analyst_count or '?' }} analysts · {{ o.consensus_quality or 'no consensus' }}</div></div>
   <div class="kpi"><div class="label">Upside (quality-adj.)</div><div class="value">{{ pl(o.adj_upside) }}</div><div class="muted">raw {{ o.upside | pct }}</div></div>
   <div class="kpi"><div class="label">Shariah</div><div class="value">{{ shariah(o.shariah) }}</div><div class="muted">{{ s.methodology }}</div></div>
+  {% if o.goal_fit %}<div class="kpi"><div class="label">Goal fit</div><div class="value">{{ o.goal_fit.level }}</div>
+    <div class="muted">{{ o.goal_fit.notes | join(' · ') or 'not enough data' }}</div></div>{% endif %}
   <div class="kpi"><div class="label">Rank score</div><div class="value">{{ o.rank_score | num(1) }}</div>{% if o.top10 %}<div><span class="chip good">top 10</span></div>{% endif %}</div>
 </section>
 
@@ -35,6 +37,7 @@
     <dl class="kv" style="margin-top:12px">
       <dt>Trend</dt><dd>{{ trend(o.trend) }} · 50d {{ o.ma50 | num }} · 200d {{ o.ma200 | num }}</dd>
       {% for k, v in o.rel_strength.items() %}<dt>6m vs {{ k }}</dt><dd>{{ pl(v) | replace('%', ' pts') }}</dd>{% endfor %}
+      {% if o.rev_growth is not none or o.eps_growth is not none %}<dt>Growth (yearly)</dt><dd>revenue {{ o.rev_growth | pct }} · earnings {{ o.eps_growth | pct }}</dd>{% endif %}
       <dt>Next event</dt><dd>{{ o.next_event or '–' }}{% if o.days_to_event is not none %} ({{ o.days_to_event }} trading days){% endif %}</dd>
     </dl>
   </section>

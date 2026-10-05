@@ -14,6 +14,7 @@ import config
 from src.models import Opportunity, MacroContext
 from src.output_gate import find_violations
 from src.sell_review import tax_note
+from src.ranking import active_weights, goal_fit
 
 _SPARK_DAYS = 126  # ~6 months of closes for the detail-page chart
 
@@ -44,6 +45,8 @@ def opportunity_row(opp: Opportunity, top10: set) -> dict:
         "short_pct_float": opp.short_pct_float, "universe_tags": opp.universe_tags,
         "thesis_status": opp.thesis_status, "thesis_notes": opp.thesis_notes,
         "exit_metrics": opp.exit_metrics, "sell_review": opp.sell_review,
+        "rev_growth": opp.rev_growth or None, "eps_growth": opp.eps_growth or None,
+        "goal_fit": goal_fit(opp) if config.PROFILE_ON else None,
         "filings": opp.filings[:10],
         "news": [{k: n.get(k, "") for k in ("title", "source", "date", "url", "provider")} for n in opp.news[:8]],
         "history": [round(p, 4) for p in opp.hist_prices[-_SPARK_DAYS:]],
@@ -64,7 +67,8 @@ def build_payload(opportunities: list[Opportunity], macro: MacroContext, *, heal
         "sources": [{"name": k, "status": v[0], "detail": v[1]} for k, v in (health.sources.items() if health else [])],
         "fx": {"date": fx.date, "source": fx.source, "eurusd": fx.rates.get("USD")} if fx is not None and fx.rates else {},
         "shariah_methodology": config.SHARIAH_METHODOLOGY,
-        "rank_weights": config.RANK_WEIGHTS,
+        "rank_weights": active_weights(),
+        "investor_profile": config.INVESTOR_PROFILE,
         "macro": {
             "regime": macro.regime, "themes": macro.themes, "geopolitical_summary": macro.geopolitical_summary,
             "indicators": {"Fed funds %": macro.fed_rate, "US CPI YoY %": macro.cpi_yoy,

@@ -325,11 +325,15 @@ def _section_cash(lines, plan):
 
 
 def _section_top10(lines, top10):
-    w = config.RANK_WEIGHTS
+    from src.ranking import active_weights
+    w = active_weights()
     weights = ", ".join(f"{k} {v:.0%}" for k, v in w.items() if v)
-    lines += ["## 🏆 Top 10 Opportunities (6-12 month horizon)", "",
+    p = config.INVESTOR_PROFILE
+    horizon = f"{p['horizon_months']}-month goal: +{p['target_return_pct']:.0f}%" if config.PROFILE_ON else "6-12 month horizon"
+    lines += [f"## 🏆 Top 10 Opportunities ({horizon})", "",
               f"*Ranked by: {weights}. Missing data lowers a score instead of counting as favourable. "
-              f"Only tickers that pass the data-quality check are ranked. Shariah status is shown as a label.*", ""]
+              f"Only tickers that pass the data-quality check and can be bought at your brokers are ranked. "
+              f"Shariah status is shown as a label.*", ""]
     for i, opp in enumerate(top10, 1):
         _card(lines, i, opp)
     lines += ["---", ""]

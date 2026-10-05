@@ -187,6 +187,17 @@ RISK_WEIGHTS = {
     "rsi_extreme": 0.15,
 }
 
+# ── Your investor profile ─────────────────────────────
+# Shapes the ranking, Claude's buy/watch/avoid view, the sell rules and the Cash plan.
+# enabled=False goes back to the balanced defaults below.
+INVESTOR_PROFILE = {
+    "enabled":           True,
+    "target_return_pct": 100.0,   # aim: double the money ...
+    "horizon_months":    12,      # ... within this many months
+    "max_drawdown_pct":  50.0,    # drop on a single stock you accept while waiting for it to pay off
+}
+PROFILE_ON = bool(INVESTOR_PROFILE.get("enabled"))
+
 # ── Ranking Weights (must sum to 1.0) ─────────────────
 # Shariah is a label only (weight 0). Set e.g. 0.15 and lower the others to rank by it.
 RANK_WEIGHTS = {
@@ -194,6 +205,17 @@ RANK_WEIGHTS = {
     "sentiment":    0.25,   # Claude, else FinBERT, else keyword score
     "risk_adj":     0.20,
     "trend":        0.20,   # price vs 50/200-day averages + relative strength
+    "growth":       0.00,   # revenue + earnings growth
+    "shariah":      0.00,
+}
+# Used instead when INVESTOR_PROFILE is enabled: growth and upside count more, steadiness less
+# (you accept large drops), so fast growers like Credo rank higher.
+RANK_WEIGHTS_GROWTH = {
+    "upside":       0.30,
+    "growth":       0.25,
+    "trend":        0.20,
+    "sentiment":    0.15,
+    "risk_adj":     0.10,
     "shariah":      0.00,
 }
 
@@ -261,10 +283,13 @@ BROKER_COST_NOTE = "Check your broker's fee and FX-conversion cost — on small 
 # ── Sell review tab (holdings) ────────────────────────
 SELL_STOP_LOSS_PCT   = ALERT_PORTFOLIO_LOSS   # % vs breakeven — strong "stop the loss" signal
 SELL_TAKE_PROFIT_PCT = 50.0    # % vs breakeven — "take profit" signal (twice this = stronger)
+if PROFILE_ON:   # you accept bigger swings and aim higher: sell later on both sides
+    SELL_STOP_LOSS_PCT = -0.7 * INVESTOR_PROFILE["max_drawdown_pct"]     # -35% for a 50% tolerance
+    SELL_TAKE_PROFIT_PCT = INVESTOR_PROFILE["target_return_pct"]          # take profit at the goal (+100%)
 SELL_STRONG_SCORE    = 4       # summed signal strength for "Strong" (sell all / a third) vs "Consider"
 TRAIL_STOP_VOL_MULT  = 2.0     # trailing stop distance = this × one-month volatility ...
 TRAIL_STOP_MIN_PCT   = 12.0    # ... but at least this far below the 6-month high
-TRAIL_STOP_MAX_PCT   = 30.0    # ... and at most this far
+TRAIL_STOP_MAX_PCT   = 40.0 if PROFILE_ON else 30.0   # ... and at most this far (wider for growth stocks)
 
 # ── Dashboard "Refresh data" ──────────────────────────
 REFRESH_TIMEOUT_MIN = 60   # a run started from the dashboard is stopped after this many minutes
@@ -274,7 +299,7 @@ CASH_TARGET_PCT      = {"Calm": 5.0, "Normal": 10.0, "Elevated": 15.0, "Stressed
 REINVEST_MAX_IDEAS   = 5        # new money goes to at most this many of the Top 10, in rank order
 REINVEST_MAX_SHARE   = 0.40     # no single idea gets more than this share of the money invested
 REINVEST_MIN_TICKET  = 250.0    # EUR — smaller buys cost too much in fees
-REINVEST_MIN_UPSIDE  = 15.0     # % quality-adjusted upside an idea needs without a Claude BUY
+REINVEST_MIN_UPSIDE  = 30.0 if PROFILE_ON else 15.0   # % quality-adjusted upside an idea needs without a Claude BUY
 REINVEST_SHARIAH_ONLY = False   # True = only Shariah "Yes" ideas get new money (label stays visible either way)
 SECTOR_SOFT_CAP_PCT  = 35.0     # buys in sectors already above this share carry a concentration note
 # Money no Top 10 idea can take: "auto" decides from the market and the candidates (keep ready for
@@ -299,7 +324,7 @@ DEFAULT_THESIS_RULES = {
     "review": [{"type": "shariah_not", "value": "Yes"},
                {"type": "trend", "value": "Downtrend"},
                {"type": "rel_strength_below", "value": -25},
-               {"type": "weight_above", "value": 12}],
+               {"type": "weight_above", "value": 20}],
 }
 
 # ── Event calendar ────────────────────────────────────
@@ -341,7 +366,7 @@ MAX_QUOTE_AGE_DAYS = 4.0     # older quotes are "stale" (covers weekends + a hol
 MAX_FAILED_SHARE   = 0.20    # run is DEGRADED when more tickers than this fail
 
 # ── Portfolio concentration ───────────────────────────
-POSITION_CAP_PCT = 12.0     # max single position, % of priced portfolio (EUR)
+POSITION_CAP_PCT = 20.0     # max single position, % of priced portfolio (EUR) — your choice (was 12)
 THEME_CAP_PCT    = 40.0     # max per theme (see "themes" in portfolio_data.py)
 TYPICAL_ADD_EUR  = 1000.0   # trade size used for "weight after an ADD" checks
 
@@ -453,3 +478,4 @@ CURRENCY_SYMBOLS = {
 # ── Sanity checks ─────────────────────────────────────
 assert abs(sum(RISK_WEIGHTS.values()) - 1.0) < 1e-9, "RISK_WEIGHTS must sum to 1.0"
 assert abs(sum(RANK_WEIGHTS.values()) - 1.0) < 1e-9, "RANK_WEIGHTS must sum to 1.0"
+assert abs(sum(RANK_WEIGHTS_GROWTH.values()) - 1.0) < 1e-9, "RANK_WEIGHTS_GROWTH must sum to 1.0"

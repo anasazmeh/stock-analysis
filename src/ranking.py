@@ -89,6 +89,41 @@ def sentiment_value(opp: Opportunity) -> Optional[float]:
     return None
 
 
+def active_weights() -> dict:
+    return config.RANK_WEIGHTS_GROWTH if config.PROFILE_ON else config.RANK_WEIGHTS
+
+
+def growth_value(opp: Opportunity) -> Optional[float]:
+    """0..1 from revenue growth (70%, full marks at +50% a year) and earnings growth (30%, full at +100%).
+    Yahoo reports a missing figure as 0, so both at exactly 0 counts as missing."""
+    rev, eps = opp.rev_growth or 0.0, opp.eps_growth or 0.0
+    if rev == 0 and eps == 0:
+        return None
+    return round(0.7 * min(max(rev, 0) / 50, 1) + 0.3 * min(max(eps, 0) / 100, 1), 3)
+
+
+def goal_fit(opp: Opportunity) -> dict:
+    """How plausibly this stock helps reach INVESTOR_PROFILE's target, from the data we have."""
+    p = config.INVESTOR_PROFILE
+    target = p["target_return_pct"]
+    up = opp.adj_upside if opp.adj_upside is not None else opp.upside
+    rev = opp.rev_growth or None
+    dd = opp.risk.max_drawdown_6mo if opp.risk else None
+    notes = []
+    if up is not None:
+        notes.append(f"analysts see {up:+.0f}% vs your {target:.0f}% goal")
+    if rev:
+        notes.append(f"revenue {rev:+.0f}% a year")
+    if dd is not None and dd > p["max_drawdown_pct"]:
+        notes.append(f"fell {dd:.0f}% in 6 months — more than the {p['max_drawdown_pct']:.0f}% you accept")
+    strong = (up or 0) >= target * 0.6 or (rev or 0) >= 50
+    possible = (up or 0) >= target * 0.3 or (rev or 0) >= 25
+    level = "Strong" if strong else "Possible" if possible else "Unlikely" if (up is not None or rev) else "Unknown"
+    if dd is not None and dd > p["max_drawdown_pct"] and level == "Strong":
+        level = "Possible"
+    return {"level": level, "notes": notes}
+
+
 def components(opp: Opportunity) -> dict:
     upside = opp.adj_upside if opp.adj_upside is not None else (
         None if opp.consensus_quality else opp.upside)
@@ -99,13 +134,14 @@ def components(opp: Opportunity) -> dict:
         "sentiment": (sent + 10) / 20.0 if sent is not None else None,
         "risk_adj":  (10 - risk) / 10.0 if risk is not None else None,
         "trend":     trend_score(opp),
+        "growth":    growth_value(opp),
         "shariah":   {"Yes": 1.0, "Review": 0.5}.get(opp.shariah.compliant, 0.0) if opp.shariah else None,
     }
 
 
 def rank_score(opp: Opportunity) -> float:
     """0..100. Weighted average of available components x (0.5 + 0.5 x coverage)."""
-    w = config.RANK_WEIGHTS
+    w = active_weights()
     comps = {k: v for k, v in components(opp).items() if w.get(k, 0) > 0}
     total_w = sum(w[k] for k in comps)
     avail = {k: v for k, v in comps.items() if v is not None}
