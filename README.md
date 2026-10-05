@@ -24,6 +24,8 @@ python3 main.py
 | `scripts/run_daily.sh` | Scheduled run (reads `.env`, logs to `logs/`, emails you if a run crashes, optional health-check pings) |
 | `python3 -m src.alerts --test` | Send a test alert to the configured email / webhook |
 
+Logs: every run started from a terminal is saved to `logs/run_YYYY-MM-DD_HHMMSS.log` (newest 30 kept); scheduled runs write `logs/run_YYYY-MM-DD.log`, and the dashboard's Refresh button writes `logs/dashboard_run.log`.
+
 Exit codes: `0` ok · `2` degraded data · `1` avoid-list leak or missing required keys.
 
 ## Pipeline

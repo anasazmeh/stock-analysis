@@ -133,7 +133,7 @@ CURATED_WATCHLIST = {
     "INFY":  ("India",       "IT services — AI transformation"),
 
     # ── Asia (local exchanges) ────────────────────────────────────────────
-    "700.HK":      ("Hong Kong",  "Tencent — tech/gaming/fintech"),
+    "0700.HK":     ("Hong Kong",  "Tencent — tech/gaming/fintech"),
     "005930.KS":   ("Korea",      "Samsung — memory/mobile/AI"),
     "066570.KS":   ("Korea",      "LG Electronics — EV parts/appliances"),
     "RELIANCE.NS": ("India",      "Conglomerate — Jio + Retail + Green H2"),
@@ -151,7 +151,7 @@ CURATED_WATCHLIST = {
     "2010.SR": ("Saudi Arabia", "SABIC — petrochemicals"),
     "7010.SR": ("Saudi Arabia", "STC — telecom + STC Pay fintech"),
 
-    # ── Middle East — UAE Abu Dhabi (ADX, .AD) ────────────────────────────
+    # ── Middle East — UAE Abu Dhabi (ADX). Yahoo may list these as .AE; src/symbols.py finds the working one ──
     "FAB.AD":      ("UAE", "First Abu Dhabi Bank — largest UAE bank"),
     "ADNOCDIST.AD":("UAE", "ADNOC Distribution — fuel retail + EV charging"),
     "IHC.AD":      ("UAE", "International Holding — diversified conglomerate"),

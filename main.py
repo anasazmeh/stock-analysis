@@ -74,6 +74,10 @@ def main() -> int:
     parser.add_argument("--ticker", help="IPO: listing ticker, if trading")
     parser.add_argument("--amount", type=float, help="IPO: amount you plan to subscribe")
     args = parser.parse_args()
+    from src import runlog
+    log_path = runlog.start()
+    if log_path:
+        print(f"Log: {log_path}")
     cache.DISABLED = args.no_cache
     HEALTH.started = datetime.now().isoformat(timespec="seconds")
 
@@ -122,12 +126,20 @@ def main() -> int:
     # ── 1. Discovery ─────────────────────────────────────────────────────
     print("📡 Stage 1: Discovering candidates...")
     tickers = sorted((set(discover_candidates()) | set(get_portfolio_tickers())) - config.AVOID_LIST)
+    from src.symbols import resolve_tickers, mark_failed, STATUS as SYMBOLS
+    held = set(get_portfolio_tickers())
+    tickers = sorted(set(resolve_tickers(tickers, keep=held)) - config.AVOID_LIST)
     print(f"   → {len(tickers)} tickers (incl. holdings)\n")
 
     # ── 2. Market data, FX, price check, data-quality gate ───────────────
     print("📊 Stage 2: Fetching market data...")
     opportunities, benchmarks = enrich_tickers(tickers)
     priced = [o for o in opportunities if o.price > 0]
+    mark_failed([o.ticker for o in opportunities if o.price <= 0 and o.ticker not in held])
+    HEALTH.record("Symbol lookup", "partial" if SYMBOLS["missing"] else "ok",
+                  "; ".join([f"{a} → {b}" for a, b in SYMBOLS["resolved"].items()]
+                            + ([f"not on Yahoo: {', '.join(SYMBOLS['missing'])}"] if SYMBOLS["missing"] else []))
+                  or "all symbols found")
     HEALTH.record("Yahoo Finance", _status(len(priced), len(opportunities)), f"{len(priced)}/{len(opportunities)} priced")
     fx = get_fx()
     HEALTH.record("ECB FX rates", "ok" if fx.rates else "failed", f"{fx.source} {fx.date}" if fx.rates else "unavailable")
