@@ -131,6 +131,15 @@ class PlanTests(unittest.TestCase):
         waits = [t for t in status if t["outcome"] == "wait"]
         self.assertTrue(all("at most" in t["why"][0] for t in waits))
 
+    def test_reasoning_explains_skips_and_cash(self):
+        opps = [held("NVDA", 8000, score=90), idea("W1", action="WATCH", score=85), idea("W2", trend="Downtrend", score=80),
+                idea("OK", score=70)]
+        plan = self.plan(opps, [sale("NVDA", 6000, 1500)])
+        text = " ".join(plan["scenarios"][0]["reasoning"])
+        self.assertIn("#2 W1", text)
+        self.assertIn("#3 W2", text)
+        self.assertIn("Only 1 idea(s) qualified", text)
+
     def test_earnings_soon_waits(self):
         opps = [held("NVDA", 8000), idea("LLY", next_event="Earnings 2026-10-08", days_to_event=3)]
         s = self.plan(opps, [sale("NVDA", 4000, 1500)])["scenarios"][0]

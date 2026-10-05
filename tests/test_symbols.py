@@ -77,3 +77,32 @@ class RunLogTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class DedupeTests(unittest.TestCase):
+    def opp(self, t, name, country="United States", vol=1e6, **kw):
+        from src.models import Opportunity
+        o = Opportunity(ticker=t, name=name, country=country, price=100.0, avg_volume=vol)
+        for k, v in kw.items():
+            setattr(o, k, v)
+        return o
+
+    def test_secondary_listings_collapse_to_home_listing(self):
+        opps = [self.opp("APC.F", "Apple Inc.", vol=5e4), self.opp("APC.DE", "APPLE INC", vol=2e5),
+                self.opp("AAPL", "Apple Inc.", vol=5e7), self.opp("SAP.DE", "SAP SE", "Germany")]
+        kept, dropped = symbols.dedupe_listings(opps)
+        self.assertEqual(sorted(o.ticker for o in kept), ["AAPL", "SAP.DE"])
+        self.assertEqual(dropped, {"APC.DE": "AAPL", "APC.F": "AAPL"})
+
+    def test_without_home_listing_most_traded_wins_and_holdings_stay(self):
+        from src.models import PortfolioHolding
+        opps = [self.opp("APC.F", "Apple Inc.", vol=5e4), self.opp("APC.DE", "Apple Inc.", vol=2e5)]
+        kept, _ = symbols.dedupe_listings(opps)
+        self.assertEqual([o.ticker for o in kept], ["APC.DE"])
+        opps = [self.opp("APC.F", "Apple Inc.", vol=5e4, portfolio=PortfolioHolding()), self.opp("AAPL", "Apple Inc.")]
+        kept, _ = symbols.dedupe_listings(opps)
+        self.assertEqual([o.ticker for o in kept], ["APC.F"])   # the line you hold is the one kept
+
+    def test_different_companies_untouched(self):
+        opps = [self.opp("SIE.DE", "Siemens AG", "Germany"), self.opp("ENR.DE", "Siemens Energy AG", "Germany")]
+        self.assertEqual(len(symbols.dedupe_listings(opps)[0]), 2)

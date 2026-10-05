@@ -337,7 +337,20 @@ def _reasoning(s: dict, market: dict, ideas: list) -> list:
     elif s["deployable_eur"] >= config.REINVEST_MIN_TICKET:
         out.append("None of the Top 10 opportunities passes the buy checks this run, so the money stays in cash until one does. "
                    "Holding cash is a position too — it keeps your options open.")
-    if s["unallocated_eur"] >= config.REINVEST_MIN_TICKET and s["buys"]:
+    status = s.get("top10_status") or []
+    skipped = [t for t in status if t["outcome"] == "skip"]
+    if skipped:
+        counts = {}
+        for t in skipped:
+            reason = t["why"][0].split(" — ")[0] if t["why"] else "other"
+            counts[reason] = counts.get(reason, []) + [f"#{t['rank']} {t['ticker']}"]
+        out.append("Top 10 names skipped: " + "; ".join(f"{', '.join(v)} ({k})" for k, v in counts.items()) + ".")
+    if s["buys"] and len(s["buys"]) < config.REINVEST_MAX_IDEAS and s["unallocated_eur"] >= config.REINVEST_MIN_TICKET:
+        out.append(f"Only {len(s['buys'])} idea(s) qualified, and one idea may take at most "
+                   f"{config.REINVEST_MAX_SHARE * 100:.0f}% of the money to invest (REINVEST_MAX_SHARE) and stay under the "
+                   f"{config.POSITION_CAP_PCT:g}% position cap — so €{s['unallocated_eur']:,.0f} waits in cash for the next "
+                   "qualifying idea instead of concentrating it in one stock.")
+    elif s["unallocated_eur"] >= config.REINVEST_MIN_TICKET and s["buys"]:
         out.append(f"€{s['unallocated_eur']:,.0f} stays cash: the ideas that qualify are already at the "
                    f"{config.POSITION_CAP_PCT:g}% position cap or the {config.REINVEST_MAX_SHARE * 100:.0f}% per-idea limit. "
                    "Spreading it over weaker ideas would lower the quality of the portfolio.")
