@@ -24,6 +24,17 @@ python3 main.py
 | `scripts/run_daily.sh` | Scheduled run (reads `.env`, logs to `logs/`, emails you if a run crashes, optional health-check pings) |
 | `python3 -m src.alerts --test` | Send a test alert to the configured email / webhook |
 
+### From your phone (at home or outside)
+```bash
+bash scripts/setup_remote.sh            # password + auto-start + Tailscale (your devices only)
+bash scripts/setup_remote.sh --public   # optional: public https link, no app needed on the device
+```
+The dashboard keeps running on your Mac (where Claude Code is logged in) behind a password: every page, the
+JSON API and **Refresh data** need login; 5 wrong tries lock that address for 15 minutes; login lasts 30 days
+per device. [Tailscale](https://tailscale.com) (free) gives your devices an encrypted https address; the dashboard
+itself only listens on 127.0.0.1. The Mac must be on and awake (the script keeps it awake while plugged in).
+`--private` removes the public link, `--stop` turns remote access off. On the phone, *Add to Home Screen* opens it like an app.
+
 Logs: every run started from a terminal is saved to `logs/run_YYYY-MM-DD_HHMMSS.log` (newest 30 kept); scheduled runs write `logs/run_YYYY-MM-DD.log`, and the dashboard's Refresh button writes `logs/dashboard_run.log`.
 
 Technical debt: each run merges its warnings and errors into [`TECH_DEBT.md`](TECH_DEBT.md), grouped by cause with a suggested fix (`python3 -m src.tech_debt --scan logs/` imports older logs).
