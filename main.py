@@ -74,10 +74,6 @@ def main() -> int:
     parser.add_argument("--ticker", help="IPO: listing ticker, if trading")
     parser.add_argument("--amount", type=float, help="IPO: amount you plan to subscribe")
     args = parser.parse_args()
-    from src import runlog
-    log_path = runlog.start()
-    if log_path:
-        print(f"Log: {log_path}")
     cache.DISABLED = args.no_cache
     HEALTH.started = datetime.now().isoformat(timespec="seconds")
 
@@ -129,6 +125,8 @@ def main() -> int:
     from src.symbols import resolve_tickers, mark_failed, STATUS as SYMBOLS
     held = set(get_portfolio_tickers())
     tickers = sorted(set(resolve_tickers(tickers, keep=held)) - config.AVOID_LIST)
+    from src import runlog
+    runlog.add_tickers(tickers)
     print(f"   → {len(tickers)} tickers (incl. holdings)\n")
 
     # ── 2. Market data, FX, price check, data-quality gate ───────────────
@@ -263,5 +261,35 @@ def main() -> int:
     return 2 if HEALTH.degraded else 0
 
 
+def run() -> int:
+    """main() plus the end-of-run issue capture, which also runs after a crash."""
+    from src import runlog
+    if not any(a in ("-h", "--help") for a in sys.argv[1:]):
+        log_path = runlog.start()
+        if log_path:
+            print(f"Log: {log_path}")
+    code = 1
+    try:
+        code = main()
+    except SystemExit as e:          # argparse --help / errors
+        code = e.code if isinstance(e.code, int) else 1
+        raise
+    except BaseException:
+        import traceback
+        traceback.print_exc()
+        code = 1
+    finally:
+        tickers = set(config.CURATED_WATCHLIST)
+        try:
+            from src.portfolio import get_portfolio_tickers
+            tickers |= set(get_portfolio_tickers())
+        except Exception:
+            pass
+        if "streams" in runlog._state:
+            runlog.finish(HEALTH, tickers, code)
+            runlog.stop()
+    return code
+
+
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(run())

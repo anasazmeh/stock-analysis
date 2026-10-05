@@ -27,8 +27,10 @@ STATUS = {"resolved": {}, "missing": []}
 
 
 def quiet_yfinance():
-    """yfinance prints every 404 itself; we report failures once, in Data Health."""
-    logging.getLogger("yfinance").setLevel(logging.CRITICAL)
+    """yfinance logs every 404 itself. src/runlog.py sends library logs to the log file and the
+    technical-debt backlog, not the screen; without it, keep the screen quiet."""
+    from src import runlog
+    logging.getLogger("yfinance").setLevel(logging.WARNING if "streams" in runlog._state else logging.CRITICAL)
 
 
 def normalize(ticker: str) -> str:
