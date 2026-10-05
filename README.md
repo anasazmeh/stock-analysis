@@ -19,7 +19,7 @@ python3 main.py
 | `python3 main.py --no-ai` | Skip the Claude analysis |
 | `python3 main.py --no-cache` | Ignore cached data |
 | `python3 main.py --ipo "SpaceX" --broker-price 162 --amount 2000` | IPO dossier with labelled offer / market / broker prices |
-| `python3 dashboard/app.py` | Web dashboard at http://127.0.0.1:8050 (portfolio, opportunities, sell review, stock pages, history, "Refresh data" button) |
+| `python3 dashboard/app.py` | Web dashboard at http://127.0.0.1:8050 (portfolio, opportunities, sell review, cash plan, stock pages, history, "Refresh data" button) |
 | `bash scripts/setup_schedule.sh` | Email alerts + weekday cron job (asks, sends a test email, installs; `--remove` to stop) |
 | `scripts/run_daily.sh` | Scheduled run (reads `.env`, logs to `logs/`, emails you if a run crashes, optional health-check pings) |
 | `python3 -m src.alerts --test` | Send a test alert to the configured email / webhook |
@@ -40,7 +40,8 @@ Exit codes: `0` ok · `2` degraded data · `1` avoid-list leak or missing requir
 6. **Risk, trend, regulatory watch, exposure, thesis rules, event calendar.**
 7. **Claude analysis** via your logged-in Claude Code (`claude -p`, no API key) on a dated evidence pack (cites the facts it used, says when data is insufficient).
 8. **Sell review** — per holding: stop the loss / protect gains / take profit / trim to cap, from the loss vs breakeven, a volatility-based trailing stop off the 6-month high, trend, thesis, analyst target and revisions, insiders, SEC red flags and Claude's holder view; suggests how many shares and the euro proceeds. Holdings with bad data get no suggestion; Shariah is listed, never scored. Thresholds: `SELL_*` / `TRAIL_STOP_*` in `config.py`.
-9. **Report, run snapshot, decision journal, alerts.**
+9. **Cash plan** — what to do with the money sales free up. Market risk level (Calm / Normal / Elevated / Stressed) from VIX, the US high-yield credit spread, the S&P 500 vs its 200-day average and 52-week high, the yield curve and Claude's read → cash reserve of 5–15% of the portfolio, plus tax on realised gains and planned withdrawals. The rest goes only to opportunities that pass every check (verified data, tradable, Claude BUY or enough upside, no downtrend, under the position cap), weighted by rank score, confidence, lower volatility and sectors you're light in; no qualifying idea → it stays cash. Tranches in nervous markets, before big macro events and around earnings. Two scenarios (Strong sells / + Consider). Inputs: `CASH_EUR` and `PLANNED_WITHDRAWALS_EUR` in `portfolio_data.py`, `CASH_TARGET_PCT`, `REINVEST_*`, fees and tax in `config.py`.
+10. **Report, run snapshot, decision journal, alerts.**
 
 ## Your files
 

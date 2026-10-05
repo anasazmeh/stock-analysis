@@ -140,3 +140,19 @@ tbody tr:hover { background: var(--surface-2); }
 .chip.protect { background: var(--warn-soft); color: var(--warn); }
 .chip.profit, .chip.trim { background: var(--good-soft); color: var(--good); }
 .chip.strong { background: var(--fg); color: var(--bg); }
+
+/* Cash plan */
+.seg-toggle { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.seg-toggle button { background: var(--surface); color: var(--muted); border: 0; padding: 6px 12px; font: inherit; cursor: pointer; }
+.seg-toggle button[aria-pressed="true"] { background: var(--accent); color: var(--surface); }
+.seg-toggle button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.splitbar { display: flex; height: 34px; border-radius: 6px; overflow: hidden; border: 1px solid var(--border); background: var(--surface-2); }
+.splitbar span { display: flex; align-items: center; justify-content: center; min-width: 0; overflow: hidden; white-space: nowrap;
+  font-size: 12px; font-weight: 600; color: var(--surface); padding: 0 4px; }
+.splitbar .keep { background: var(--muted); } .splitbar .tax { background: var(--warn); }
+.splitbar .buy { background: var(--accent); border-left: 1px solid var(--surface); } .splitbar .left { background: var(--info); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; margin-top: 8px; }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+.flow { width: 100%; } .flow td:first-child { color: var(--muted); white-space: normal; } .flow td.num { white-space: nowrap; } .flow tr.total td { font-weight: 650; border-top: 2px solid var(--border); color: var(--fg); }
+.level { font-size: 22px; font-weight: 650; }
+.reasoning li { margin: 6px 0; max-width: 75ch; }

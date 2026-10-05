@@ -298,6 +298,28 @@ def _section_sell(lines, rows):
     lines += ["", f"*Before selling: {config.BROKER_COST_NOTE} {tax_note()}*", "", "---", ""]
 
 
+def _section_cash(lines, plan):
+    s, m = plan["scenarios"][0], plan["market"]
+    lines += ["## 💶 Cash Plan", "",
+              f"Market risk: **{m['level']}** ({m['coverage']}). Scenario: {s['name'].lower()}.", "",
+              "| | EUR |", "|---|---:|",
+              f"| Sale proceeds | {_eur(s['proceeds_eur'])} |",
+              f"| − fees | {_eur(s['sell_fees_eur'])} |",
+              f"| + cash you hold | {_eur(s['existing_cash_eur'])} |",
+              f"| **= available** | **{_eur(s['available_eur'])}** |",
+              f"| Keep as cash (reserve {s['target_cash_pct']:g}% + tax + planned withdrawals) | {_eur(s['keep_eur'])} |",
+              f"| Invest | {_eur(s['invest_eur'])} |",
+              f"| Not placed (stays cash) | {_eur(s['unallocated_eur'])} |", ""]
+    if s["buys"]:
+        lines += ["| Buy | Shares | ≈ EUR | Share | Shariah | When | Why |", "|---|---:|---:|---:|---|---|---|"]
+        for b in s["buys"]:
+            when = ", ".join(f"{t['pct']}% {t['when']}" for t in b["tranches"])
+            lines.append(f"| {b['ticker']} | {b['units']:g} | {_eur(b['eur'])} | {b['share_pct']:.0f}% | {b['shariah']} | {when} | "
+                         f"{'; '.join(b['reasons'][:2]).replace('|', '/')} |")
+        lines.append("")
+    lines += [f"- {r.replace('**', '')}" for r in s["reasoning"]] + ["", "---", ""]
+
+
 def _section_top10(lines, top10):
     w = config.RANK_WEIGHTS
     weights = ", ".join(f"{k} {v:.0%}" for k, v in w.items() if v)
@@ -385,7 +407,7 @@ def _section_methodology(lines, run_date):
 def generate_report(opportunities: list[Opportunity], macro: MacroContext, *, health=None, fx=None,
                     exposure: dict = None, unpriced: list = None, changes: list = None,
                     purification_rows: list = None, broker_diffs: list = None, scorecard: dict = None,
-                    av_stats: dict = None, sell_rows: list = None) -> tuple[str, list[Opportunity]]:
+                    av_stats: dict = None, sell_rows: list = None, cash_plan: dict = None) -> tuple[str, list[Opportunity]]:
     """Render the report. Returns (markdown, top10)."""
     run_date = datetime.now().strftime("%B %d, %Y — %H:%M")
     ranked = sorted([o for o in opportunities if o.price > 0 and o.data_ok],
@@ -403,6 +425,8 @@ def generate_report(opportunities: list[Opportunity], macro: MacroContext, *, he
                        unpriced or [], exposure or {}, fx, purification_rows or [], broker_diffs, scorecard)
     if sell_rows:
         _section_sell(lines, sell_rows)
+    if cash_plan:
+        _section_cash(lines, cash_plan)
     _section_top10(lines, top10)
     _section_shariah(lines, ranked)
     _section_universe(lines, ranked)

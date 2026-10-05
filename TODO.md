@@ -20,7 +20,9 @@ Portfolio data
 - [ ] Yahoo tickers for the Nasdaq-100 ETF, gold ETC and silver ETC in `portfolio_data.py` (unpriced until set)
 - [ ] Keep `shares` / `bep` current after each trade — or put DEGIRO / Revolut CSV exports in `data/broker/`
 - [ ] Copy `data/theses.example.json` → `data/theses.json`; write a thesis and sell rules per holding
-- [ ] Set `TAX_RESIDENCE` in `config.py`
+- [ ] Set `TAX_RESIDENCE` in `config.py` (also sets the tax the Cash plan keeps aside)
+- [ ] Set `CASH_EUR` (cash at DEGIRO / Revolut) and `PLANNED_WITHDRAWALS_EUR` in `portfolio_data.py` for the Cash plan
+- [ ] Check `BROKER_FEE_EUR` / `FX_FEE_PCT` in `config.py` against your broker's price list
 
 After the first real run
 - [ ] Abu Dhabi (`.AD`) and Dubai (`.AE`) tickers not flagged "wrong listing"
@@ -119,6 +121,9 @@ it appeared in and a suggested fix. Items not seen for 5 runs move to *Resolved*
       safety net, keep the key set
 - [ ] **Broker CSV import** column names are guessed from DEGIRO / Revolut docs — check against your real exports
 - [ ] **Dashboard uses Flask's development server** — fine on 127.0.0.1, never expose it to a network
+- [ ] **Cash balance is typed in by hand** — import it from the DEGIRO "Account" CSV / Revolut statement
+- [ ] **Cash plan market signals**: optional breadth (share of S&P 500 above its 200-day average) and AAII sentiment
+      would sharpen the risk level — free sources, not connected yet
 - [ ] **Shariah ratios use annual statements** — quarterly data would catch debt changes sooner
 
 ---
@@ -127,7 +132,8 @@ it appeared in and a suggested fix. Items not seen for 5 runs move to *Resolved*
 `python3 dashboard/app.py` → http://127.0.0.1:8050 (local only). Pages: Overview (alerts, what changed,
 events, Top 10, data health), Portfolio (sortable holdings, P&L and exposure charts, thesis checks,
 purification), Opportunities (filters, sortable table, regional heatmap), Sell review (stop the loss /
-protect gains / take profit / trim, with shares and euro estimates), a page per stock (price chart,
+protect gains / take profit / trim, with shares and euro estimates), Cash plan (keep vs reinvest, with
+amounts per idea and the reasoning), a page per stock (price chart,
 AI view, Shariah ratios, risk, filings, news) and History (portfolio vs MSCI World Islamic).
 "Refresh data" runs the pipeline in the background. Data comes from `reports/latest.json`, written by every run.
 
@@ -154,6 +160,7 @@ AI view, Shariah ratios, risk, filings, news) and History (portfolio vs MSCI Wor
 - [x] Roadmap "Now": EUR P&L via ECB FX · accurate Shariah label (AAOIFI 30/30/5, statement inputs, currency-consistent, label only) · data-quality gate + DEGRADED runs · fixed news and Form 4 parsers · grounded Claude evidence packs · single entry point + avoid-list output gate
 - [x] Roadmap "Next": event calendar + earnings blackout · Alpha Vantage budget · consensus quality · exposure caps + funds in holdings · IPO dossier mode · regional discovery · filings-driven Shariah review · Shariah second-opinion links + status history · news normalisation · trend + sell discipline · decision journal + run snapshots · Gulf symbols + broker coverage · broker CSV reconciliation · Federal Register regulatory watch · Data Health, run script, tests
 - [x] Web dashboard (Flask + Chart.js, works offline)
+- [x] Cash plan tab: market risk level, cash reserve, tax set-aside, allocation to qualifying ideas, tranches
 - [x] Sell review tab: trailing stop, drawdown from 6-month high, 3-month return; sell verdicts with share counts and EUR estimates
 - [x] Roadmap "Later": crowding (short interest) · purification estimate · tax/broker cost notes · price-type labelling + liquidity flag · monthly scorecard vs MSCI World Islamic
 
