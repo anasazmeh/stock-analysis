@@ -278,6 +278,26 @@ def _card(lines, i, opp: Opportunity):
     lines += [f"| **Rank score** | {opp.rank_score:.1f}/100 |", ""]
 
 
+def _section_sell(lines, rows):
+    act = [r for r in rows if r["strength"]]
+    lines += ["## 🔻 Sell Review", "",
+              f"{len(act)} holding(s) with a sell signal. Shariah status is listed but never changes the verdict.", "",
+              "| Ticker | Verdict | P&L | Weight | Suggestion | Main reasons |", "|---|---|---:|---:|---|---|"]
+    for r in rows:
+        if r["category"] == "Hold":
+            continue
+        reasons = "; ".join(s["text"] for s in r["signals"][:3]) or "; ".join(r.get("problems", []))
+        verdict = f"{r['strength']} · {r['category']}" if r["strength"] else r["category"]
+        extra = f" (≈ {_eur(r['proceeds_eur'])})" if r.get("proceeds_eur") else ""
+        lines.append(f"| {r['ticker']} | {verdict} | {_pct(r['pl_pct'])} | {_pct(r['weight_pct'], False)} | "
+                     f"{r['action']}{extra} | {reasons.replace('|', '/')} |")
+    held = [r['ticker'] for r in rows if r["category"] == "Hold"]
+    if held:
+        lines += ["", f"No sell signal: {', '.join(held)}."]
+    from src.sell_review import tax_note
+    lines += ["", f"*Before selling: {config.BROKER_COST_NOTE} {tax_note()}*", "", "---", ""]
+
+
 def _section_top10(lines, top10):
     w = config.RANK_WEIGHTS
     weights = ", ".join(f"{k} {v:.0%}" for k, v in w.items() if v)
@@ -365,7 +385,7 @@ def _section_methodology(lines, run_date):
 def generate_report(opportunities: list[Opportunity], macro: MacroContext, *, health=None, fx=None,
                     exposure: dict = None, unpriced: list = None, changes: list = None,
                     purification_rows: list = None, broker_diffs: list = None, scorecard: dict = None,
-                    av_stats: dict = None) -> tuple[str, list[Opportunity]]:
+                    av_stats: dict = None, sell_rows: list = None) -> tuple[str, list[Opportunity]]:
     """Render the report. Returns (markdown, top10)."""
     run_date = datetime.now().strftime("%B %d, %Y — %H:%M")
     ranked = sorted([o for o in opportunities if o.price > 0 and o.data_ok],
@@ -381,6 +401,8 @@ def generate_report(opportunities: list[Opportunity], macro: MacroContext, *, he
     _section_market(lines, macro)
     _section_portfolio(lines, sorted([o for o in opportunities if o.price > 0], key=lambda o: o.ticker),
                        unpriced or [], exposure or {}, fx, purification_rows or [], broker_diffs, scorecard)
+    if sell_rows:
+        _section_sell(lines, sell_rows)
     _section_top10(lines, top10)
     _section_shariah(lines, ranked)
     _section_universe(lines, ranked)

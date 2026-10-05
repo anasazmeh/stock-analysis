@@ -139,6 +139,12 @@ def evidence_pack(opp: Opportunity) -> dict:
         add("position_themes", p.themes, "portfolio_data.py")
         add("thesis_status", opp.thesis_status, "data/theses.json rules")
         add("thesis_notes", opp.thesis_notes, "data/theses.json rules")
+        m = opp.exit_metrics or {}
+        add("drawdown_from_6m_high_pct", m.get("drawdown_from_high_pct"), "computed from price history")
+        if "trail_stop_price" in m:
+            add("trailing_stop", f"{m['trail_stop_price']} ({m['trail_stop_pct']}% below the 6-month high"
+                f"{', HIT' if m['trail_stop_hit'] else ''})", "computed: 2x one-month volatility, 12-30%")
+        add("return_3m_pct", m.get("return_3m_pct"), "computed from price history")
     return {"ticker": opp.ticker, "name": opp.name, "sector": opp.sector, "country": opp.country,
             "held": bool(opp.portfolio), "facts": facts}
 

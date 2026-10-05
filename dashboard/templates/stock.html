@@ -100,6 +100,7 @@
       <dt>Themes</dt><dd>{{ h.themes | join(', ') or '–' }}</dd>
       <dt>Thesis</dt><dd>{{ thesis(o.thesis_status) }}</dd>
       <dt>Your status</dt><dd>{{ h.status or '–' }}</dd>
+      {% if o.sell_review %}<dt>Sell review</dt><dd><a href="{{ url_for('sell') }}">{{ o.sell_review.category }}{% if o.sell_review.strength %} ({{ o.sell_review.strength | lower }}){% endif %}</a> · {{ o.sell_review.action }}</dd>{% endif %}
     </dl>
     {% if o.thesis_notes %}<ul class="list">{% for x in o.thesis_notes %}<li>{{ x }}</li>{% endfor %}</ul>{% endif %}
     {% else %}<p class="muted">You don't hold this stock.</p>{% endif %}

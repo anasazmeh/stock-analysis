@@ -93,6 +93,12 @@ def check_conditions(opportunities: list[Opportunity], health=None, exposure: di
                 _add(alerts, level, opp.ticker, f"Shariah status changed {s_before} → {opp.shariah.compliant}: "
                      + "; ".join(opp.shariah.reasons[:2]))
 
+            sr = opp.sell_review or {}
+            if sr.get("strength") == "Strong" and sr.get("category") in ("Stop the loss", "Protect gains"):
+                _add(alerts, "DANGER", opp.ticker, f"Sell review: {sr['category']} — {sr['action']}. {config.BROKER_COST_NOTE}")
+            elif sr.get("strength") == "Strong":
+                _add(alerts, "INFO", opp.ticker, f"Sell review: {sr['category']} — {sr['action']}")
+
         # ── New-money signals ──
         can_signal = allow_new_signals and price_ok and opp.tradable != "Watch only" and not is_exit_candidate(opp)
         upside = opp.adj_upside

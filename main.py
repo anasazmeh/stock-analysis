@@ -112,6 +112,7 @@ def main() -> int:
     from src.journal import latest_snapshot, what_changed, write_snapshot, append_decisions, scorecard
     from src.alerts import dispatch_alerts
     from src.dashboard_data import build_payload, write_latest
+    from src.sell_review import apply_exit_metrics, review_holdings
 
     # ── 0. Broker reconciliation ─────────────────────────────────────────
     broker_diffs = run_reconciliation(HOLDINGS)
@@ -188,6 +189,7 @@ def main() -> int:
     # ── 6. Risk, trend, regulatory watch, exposure, theses, events ───────
     print("⚠️  Stage 6: Risk, trend, exposure, events...")
     opportunities = compute_risk(opportunities, benchmarks)
+    opportunities = apply_exit_metrics(opportunities)   # trailing stop etc., before the Claude stage
     macro = apply_geo_watch(opportunities, macro)
     from src.geo_watch import STATUS as GEO_STATUS
     HEALTH.record("Federal Register watch", "failed" if GEO_STATUS["failed_queries"] else "ok",
@@ -224,10 +226,11 @@ def main() -> int:
     ranked_now = sorted([o for o in opportunities if o.price > 0 and o.data_ok], key=lambda o: -o.rank_score)
     changes = what_changed(opportunities, ranked_now[:10], previous)
     unpriced = unpriced_holdings(opportunities)
+    sell_rows = review_holdings(opportunities, fx, broker_diffs)
     report, top10 = generate_report(opportunities, macro, health=HEALTH, fx=fx, exposure=exposure,
                                     unpriced=unpriced, changes=changes,
                                     purification_rows=pur, broker_diffs=broker_diffs, scorecard=card,
-                                    av_stats=av_stats)
+                                    av_stats=av_stats, sell_rows=sell_rows)
     report, removed = scrub(report)
     path = save_report(report)
     write_snapshot(opportunities, top10, HEALTH, prompt_digest,
@@ -236,7 +239,8 @@ def main() -> int:
     alerts, removed_alerts = dispatch_alerts(opportunities, macro, HEALTH, exposure, previous, broker_diffs)
     _, removed_dash = write_latest(build_payload(
         opportunities, macro, health=HEALTH, fx=fx, exposure=exposure, unpriced=unpriced, top10=top10,
-        alerts=alerts, changes=changes, purification_rows=pur, broker_diffs=broker_diffs, scorecard=card))
+        alerts=alerts, changes=changes, purification_rows=pur, broker_diffs=broker_diffs, scorecard=card,
+        sell_rows=sell_rows))
     removed_alerts += removed_dash
 
     print(f"\n{'=' * 60}\n  ✅ Report: {path}\n{'=' * 60}\n")

@@ -99,7 +99,8 @@ weekday cron job (default 07:00, your computer's time). It is safe to re-run; `-
 ## 🖥️ Web Dashboard
 `python3 dashboard/app.py` → http://127.0.0.1:8050 (local only). Pages: Overview (alerts, what changed,
 events, Top 10, data health), Portfolio (sortable holdings, P&L and exposure charts, thesis checks,
-purification), Opportunities (filters, sortable table, regional heatmap), a page per stock (price chart,
+purification), Opportunities (filters, sortable table, regional heatmap), Sell review (stop the loss /
+protect gains / take profit / trim, with shares and euro estimates), a page per stock (price chart,
 AI view, Shariah ratios, risk, filings, news) and History (portfolio vs MSCI World Islamic).
 "Refresh data" runs the pipeline in the background. Data comes from `reports/latest.json`, written by every run.
 
@@ -126,6 +127,7 @@ AI view, Shariah ratios, risk, filings, news) and History (portfolio vs MSCI Wor
 - [x] Roadmap "Now": EUR P&L via ECB FX · accurate Shariah label (AAOIFI 30/30/5, statement inputs, currency-consistent, label only) · data-quality gate + DEGRADED runs · fixed news and Form 4 parsers · grounded Claude evidence packs · single entry point + avoid-list output gate
 - [x] Roadmap "Next": event calendar + earnings blackout · Alpha Vantage budget · consensus quality · exposure caps + funds in holdings · IPO dossier mode · regional discovery · filings-driven Shariah review · Shariah second-opinion links + status history · news normalisation · trend + sell discipline · decision journal + run snapshots · Gulf symbols + broker coverage · broker CSV reconciliation · Federal Register regulatory watch · Data Health, run script, tests
 - [x] Web dashboard (Flask + Chart.js, works offline)
+- [x] Sell review tab: trailing stop, drawdown from 6-month high, 3-month return; sell verdicts with share counts and EUR estimates
 - [x] Roadmap "Later": crowding (short interest) · purification estimate · tax/broker cost notes · price-type labelling + liquidity flag · monthly scorecard vs MSCI World Islamic
 
 ## ⏳ Not Done (deliberately)
