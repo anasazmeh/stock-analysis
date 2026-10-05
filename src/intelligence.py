@@ -36,6 +36,23 @@ SYSTEM = (
     "financial advice."
 )
 
+
+def profile_text() -> str:
+    """The investor's goal, so BUY / WATCH / AVOID are judged against it (config.INVESTOR_PROFILE)."""
+    p = config.INVESTOR_PROFILE
+    if not p.get("enabled"):
+        return ""
+    return (f" Investor goal: aims for about +{p['target_return_pct']:.0f}% within {p['horizon_months']} months and "
+            f"accepts drops of up to {p['max_drawdown_pct']:.0f}% on a single stock while waiting; a position may be "
+            f"at most {config.POSITION_CAP_PCT:g}% of the portfolio. Judge new_buyer_action against this goal: BUY only "
+            "when the evidence shows a credible path to a large gain within the horizon (strong revenue or earnings "
+            "growth, catalysts, analyst upside) and the downside fits the accepted drop; WATCH when the company is good "
+            "but the likely gain is too small for the goal or the timing is poor; AVOID when a permanent loss is likely. "
+            "In the thesis, say in one sentence how the stock could or could not contribute to the goal.")
+
+
+SYSTEM = SYSTEM + profile_text()
+
 _ANALYSIS_SCHEMA = {
     "type": "object",
     "properties": {

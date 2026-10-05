@@ -136,7 +136,7 @@ def write_snapshot(opportunities: list[Opportunity], top10: list[Opportunity], h
         "git_sha": _git_sha(),
         "model": (f"claude-cli:{config.CLAUDE_CLI_MODEL}" if config.AI_BACKEND == "claude-cli" else config.CLAUDE_MODEL),
         "prompt_hash": prompt_hash,
-        "rank_weights": config.RANK_WEIGHTS,
+        "rank_weights": __import__("src.ranking", fromlist=["active_weights"]).active_weights(),
         "shariah_methodology": config.SHARIAH_METHODOLOGY,
         "degraded": health.degraded,
         "degraded_reasons": health.degraded_reasons,

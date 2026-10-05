@@ -44,7 +44,24 @@ class ExitMetricsTests(unittest.TestCase):
         self.assertNotIn("trail_stop_price", o.exit_metrics)
 
 
+
+BALANCED = {"POSITION_CAP_PCT": 12.0, "SELL_TAKE_PROFIT_PCT": 50.0, "SELL_STOP_LOSS_PCT": -20.0,
+            "REINVEST_MIN_UPSIDE": 15.0, "TRAIL_STOP_MAX_PCT": 30.0}
+
+
+def balanced(test):
+    """Run a test with the balanced (no investor profile) settings these numbers were written for."""
+    from unittest import mock
+    patches = [mock.patch.object(config, k, v) for k, v in BALANCED.items()]
+    for p in patches:
+        p.start()
+    test.addCleanup(lambda: [p.stop() for p in patches])
+
+
 class SellReviewTests(unittest.TestCase):
+    def setUp(self):
+        balanced(self)
+
     def test_strong_stop_loss_sells_all(self):
         o = holding(price=70.0, bep=100.0, trend="Downtrend", prices=[100.0] * 100 + [70.0] * 100)
         r = review_holding(o, FX)
