@@ -6,6 +6,34 @@
 
 ## 🔴 Immediate — Do These First
 
+### ✅ Your checklist (status as of 2026-10-05)
+Setup on the Mac
+- [x] `bash scripts/setup.sh` — packages in `.venv`, SEC contact, keys in `.env`
+- [x] Claude Code installed and logged in
+- [x] Dashboard runs at http://127.0.0.1:8050
+- [x] Daily run scheduled (weekdays 12:00)
+- [ ] Test email arrives (Hotmail inbox or Junk) — if not, `bash scripts/setup_schedule.sh`, answer `y`, fresh Gmail app password
+- [ ] First full run `python3 main.py`, then every source ✅ in **Data Health**
+- [ ] Add `FRED_API_KEY` once received (re-run `bash scripts/setup.sh`; it only asks for missing keys)
+
+Portfolio data
+- [ ] Yahoo tickers for the Nasdaq-100 ETF, gold ETC and silver ETC in `portfolio_data.py` (unpriced until set)
+- [ ] Keep `shares` / `bep` current after each trade — or put DEGIRO / Revolut CSV exports in `data/broker/`
+- [ ] Copy `data/theses.example.json` → `data/theses.json`; write a thesis and sell rules per holding
+- [ ] Set `TAX_RESIDENCE` in `config.py`
+
+After the first real run
+- [ ] Abu Dhabi (`.AD`) and Dubai (`.AE`) tickers not flagged "wrong listing"
+- [ ] Add broker-tradable "Watch only" names to `TRADABILITY_OVERRIDES`
+
+Optional
+- [ ] healthchecks.io ping URL (warns when the Mac slept through 12:00)
+- [ ] FinBERT sentiment: `.venv/bin/python -m pip install -r requirements-ml.txt` (~1-2 GB)
+- [ ] Monthly SPUS / HLAL / ISWD holdings CSVs in `data/universe/`
+- [ ] Slack / Discord alerts: `ALERT_WEBHOOK_URL` in `.env`
+
+The sections below explain each step.
+
 ### Quick setup
 Run `bash scripts/setup.sh` — it installs the packages, checks Claude Code, and asks for your name/email
 (SEC contact) and the free keys below, saving them to `.env` (private, git-ignored, read automatically).
@@ -17,7 +45,7 @@ Settings in `config.py`: `AI_BACKEND` ("claude-cli" / "api" / "off"), `CLAUDE_CL
 ("opus" / "sonnet"), `AI_MAX_TICKERS` (holdings first; lower it to use less of your plan's limits).
 
 ### 1. Get Free API Keys
-Three keys unlock features already coded in the pipeline:
+Four keys unlock features already coded in the pipeline:
 
 | Key | Sign-up URL | Unlocks |
 |-----|-------------|---------|
@@ -26,12 +54,7 @@ Three keys unlock features already coded in the pipeline:
 | `FINNHUB_API_KEY` | https://finnhub.io/register (free) | Second price source — flags Yahoo prices that disagree; extra company news |
 | `FRED_API_KEY` | https://fred.stlouisfed.org/docs/api/api_key.html (free) | Fed rate, CPI, yield curve, VIX in the macro section |
 
-Export them before running:
-```bash
-export NEWSAPI_KEY="your_key"
-export ALPHA_VANTAGE_API_KEY="your_key"
-python3 main.py
-```
+`bash scripts/setup.sh` asks for them and saves them to `.env`; you can also add `KEY="value"` lines to `.env` by hand.
 
 ### 1b. Set Up the Free No-Key Sources
 These run automatically (GDELT, SEC filings, Wikipedia index lists, article text), but need:
