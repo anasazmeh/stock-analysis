@@ -54,24 +54,54 @@
   const btn = document.getElementById("refresh-btn");
   if (btn) {
     const status = document.getElementById("refresh-status");
+    const cancel = document.getElementById("refresh-cancel");
+    const mmss = s => Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+    const show = (text, withLog) => {
+      status.textContent = text + (withLog ? " · " : "");
+      if (withLog) { const a = document.createElement("a"); a.href = "/refresh/log"; a.textContent = "log"; status.appendChild(a); }
+    };
+    const idle = () => { btn.disabled = false; btn.textContent = "Refresh data"; if (cancel) cancel.hidden = true; };
+    const busy = () => { btn.disabled = true; btn.textContent = "Running…"; if (cancel) cancel.hidden = false; };
+    const handle = function (r) {
+      if (r.status === 401) { location.href = "/login?next=" + encodeURIComponent(location.pathname); return null; }
+      if (r.status === 403) { idle(); show("Blocked: open the dashboard from its own address and try again"); return null; }
+      return r.json();
+    };
+    let watching = false;   // true once this page has seen a run in progress
     const poll = function () {
-      fetch("/refresh/status").then(r => r.json()).then(function (s) {
-        if (s.running) { status.textContent = "Running since " + s.started.slice(11, 16) + "…"; setTimeout(poll, 5000); return; }
-        btn.disabled = false; btn.textContent = "Refresh data";
-        if (s.finished) {
-          status.textContent = s.exit_code === 0 ? "Done — reloading" : (s.exit_code === 2 ? "Done (degraded data) — reloading" : "Run failed (see logs/dashboard_run.log)");
-          if (s.exit_code === 0 || s.exit_code === 2) setTimeout(() => location.reload(), 1200);
+      fetch("/refresh/status", { cache: "no-store" }).then(handle).then(function (s) {
+        if (!s) return;
+        if (s.running) {
+          watching = true;
+          busy();
+          const step = (s.stage || "starting").replace(/^[^A-Za-z]*/, "");
+          show(mmss(s.elapsed_s || 0) + " · " + step, true);
+          setTimeout(poll, 4000);
+          return;
         }
-      }).catch(() => { status.textContent = "Lost contact with the dashboard"; btn.disabled = false; });
+        idle();
+        if (!s.finished || !watching) return;
+        watching = false;
+        const msg = { 0: "Done — reloading", 2: "Done (some data missing) — reloading", timeout: "Stopped: the run took longer than " + s.timeout_min + " min",
+                      cancelled: "Cancelled" }[s.exit_code] || ("Run failed (exit code " + s.exit_code + ")");
+        show(msg, !(s.exit_code === 0 || s.exit_code === 2));
+        if (s.exit_code === 0 || s.exit_code === 2) setTimeout(() => location.reload(), 1200);
+      }).catch(() => { show("Lost contact with the dashboard — retrying"); setTimeout(poll, 10000); });
     };
     btn.addEventListener("click", function () {
-      btn.disabled = true; btn.textContent = "Running…";
+      busy(); show("Starting…"); watching = true;
       fetch("/refresh", { method: "POST" }).then(function (r) {
-        if (r.status === 409) status.textContent = "A run is already in progress";
-        poll();
-      }).catch(() => { btn.disabled = false; status.textContent = "Could not start the run"; });
+        if (r.status === 409) show("A run is already in progress");
+        return handle(r);
+      }).then(s => { if (s) poll(); }).catch(() => { idle(); show("Could not start the run"); });
     });
-    fetch("/refresh/status").then(r => r.json()).then(s => { if (s.running) { btn.disabled = true; btn.textContent = "Running…"; poll(); } });
+    if (cancel) cancel.addEventListener("click", function () {
+      cancel.disabled = true;
+      fetch("/refresh/cancel", { method: "POST" }).then(handle).finally(() => { cancel.disabled = false; poll(); });
+    });
+    // Phones pause timers in the background: check again when the page comes back.
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) poll(); });
+    poll();
   }
 })();
 

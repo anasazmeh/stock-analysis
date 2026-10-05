@@ -37,6 +37,7 @@ AI_MAX_TICKERS     = 40          # holdings first, then highest-ranked — keeps
 CLAUDE_MODEL  = "claude-opus-5-5"   # api backend only
 CLAUDE_EFFORT = "high"              # api backend only
 BATCH_SIZE    = 4        # tickers per Claude API call (failed batches retry one by one)
+AI_PARALLEL   = 3        # Claude calls running at the same time (lower it if your plan hits rate limits)
 
 # ── Discovery ─────────────────────────────────────────
 # Predefined Yahoo screens. "day_gainers" / "most_actives" were dropped: they surface hype, not quality.
@@ -264,6 +265,9 @@ SELL_STRONG_SCORE    = 4       # summed signal strength for "Strong" (sell all /
 TRAIL_STOP_VOL_MULT  = 2.0     # trailing stop distance = this × one-month volatility ...
 TRAIL_STOP_MIN_PCT   = 12.0    # ... but at least this far below the 6-month high
 TRAIL_STOP_MAX_PCT   = 30.0    # ... and at most this far
+
+# ── Dashboard "Refresh data" ──────────────────────────
+REFRESH_TIMEOUT_MIN = 60   # a run started from the dashboard is stopped after this many minutes
 
 # ── Cash plan tab (what to do with cash from sales) ───
 CASH_TARGET_PCT      = {"Calm": 5.0, "Normal": 10.0, "Elevated": 15.0, "Stressed": 15.0}  # % of portfolio kept as cash

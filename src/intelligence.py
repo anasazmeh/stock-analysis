@@ -314,15 +314,20 @@ def analyze_tickers(opportunities: list[Opportunity], macro: MacroContext) -> tu
                 o.analysis = results[o.ticker]
         return [t for t in packs if t not in results]
 
-    for i in range(0, len(eligible), config.BATCH_SIZE):
-        batch = eligible[i:i + config.BATCH_SIZE]
+    def run_with_retry(batch):
         print(f"  [intelligence] Analyzing {[o.ticker for o in batch]}")
-        missing = run(batch)
-        for t in missing:  # retry one by one
+        for t in run(batch):  # retry one by one
             single = [o for o in batch if o.ticker == t]
             if run(single):
                 print(f"  [intelligence] {t}: no valid analysis")
-    combined = hashlib.sha256("".join(hashes).encode()).hexdigest()[:12] if hashes else ""
+
+    # A few batches at once: a full run is 10 Claude calls of 1-3 minutes each, which took 20+ minutes in a row.
+    from concurrent.futures import ThreadPoolExecutor
+    batches = [eligible[i:i + config.BATCH_SIZE] for i in range(0, len(eligible), config.BATCH_SIZE)]
+    with ThreadPoolExecutor(max_workers=max(1, config.AI_PARALLEL)) as pool:
+        for n, _ in enumerate(pool.map(run_with_retry, batches), 1):
+            print(f"  [intelligence] {n}/{len(batches)} batches done")
+    combined = hashlib.sha256("".join(sorted(hashes)).encode()).hexdigest()[:12] if hashes else ""
     return opportunities, combined
 
 
