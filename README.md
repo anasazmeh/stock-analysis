@@ -26,6 +26,8 @@ python3 main.py
 
 Logs: every run started from a terminal is saved to `logs/run_YYYY-MM-DD_HHMMSS.log` (newest 30 kept); scheduled runs write `logs/run_YYYY-MM-DD.log`, and the dashboard's Refresh button writes `logs/dashboard_run.log`.
 
+Technical debt: each run merges its warnings and errors into [`TECH_DEBT.md`](TECH_DEBT.md), grouped by cause with a suggested fix (`python3 -m src.tech_debt --scan logs/` imports older logs).
+
 Exit codes: `0` ok · `2` degraded data · `1` avoid-list leak or missing required keys.
 
 ## Pipeline

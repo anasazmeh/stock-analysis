@@ -96,6 +96,33 @@ weekday cron job (default 07:00, your computer's time). It is safe to re-run; `-
 
 ---
 
+## 🧰 Technical Debt
+
+### From the logs (automatic)
+Every run collects the warnings and errors it prints, plus library warnings (yfinance, pandas) and any
+Data Health source that wasn't ✅, and merges them into **[TECH_DEBT.md](TECH_DEBT.md)**: grouped by cause
+(network, missing setup, symbol, email, data quality, code bug), with the tickers affected, how many runs
+it appeared in and a suggested fix. Items not seen for 5 runs move to *Resolved*.
+- [ ] After a few real runs, work through TECH_DEBT.md top to bottom (errors first)
+- [ ] Import the logs you already have: `python3 -m src.tech_debt --scan logs/`
+- [ ] Commit TECH_DEBT.md now and then so the backlog is visible on GitHub
+
+### Known design debt
+- [ ] **No CI** — tests only run by hand; add a GitHub Actions workflow running `python3 -m unittest discover tests`
+- [ ] **Live-data parsers are tested against documented formats only** (the build sandbox can't reach Yahoo, SEC,
+      GDELT…) — save a few real responses as test fixtures after the first runs
+- [ ] **Abu Dhabi suffix unconfirmed** (`.AD` vs `.AE` on Yahoo) — check the "Symbol lookup" line in Data Health, then fix `config.py`
+- [ ] **`MACRO_EVENTS` in `config.py` ends on 2026-12-17** — add the 2027 Fed / ECB / CPI dates before then
+- [ ] **Most modules report with `print()`** — issue capture relies on wording ("failed", "✗", "warning");
+      move to `logging` with levels when touching a module
+- [ ] **yfinance is an unofficial Yahoo API** — it breaks every few months; the Finnhub price cross-check is the
+      safety net, keep the key set
+- [ ] **Broker CSV import** column names are guessed from DEGIRO / Revolut docs — check against your real exports
+- [ ] **Dashboard uses Flask's development server** — fine on 127.0.0.1, never expose it to a network
+- [ ] **Shariah ratios use annual statements** — quarterly data would catch debt changes sooner
+
+---
+
 ## 🖥️ Web Dashboard
 `python3 dashboard/app.py` → http://127.0.0.1:8050 (local only). Pages: Overview (alerts, what changed,
 events, Top 10, data health), Portfolio (sortable holdings, P&L and exposure charts, thesis checks,

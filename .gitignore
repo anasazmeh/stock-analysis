@@ -11,3 +11,4 @@ runs/
 data/broker/
 logs/
 .venv/
+data/tech_debt.json
