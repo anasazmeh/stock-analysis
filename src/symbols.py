@@ -161,7 +161,10 @@ def company_key(name: str) -> str:
     n = (name or "").lower().replace("&", " and ")
     n = _LEGAL.sub(" ", n)
     n = re.sub(r"[^a-z0-9 ]", " ", n)
-    return re.sub(r"\s+", " ", n).strip()
+    words = n.split()
+    while len(words) > 1 and len(words[-1]) == 1:   # "Apple Inc. R" (registered share class marker), "... A"
+        words.pop()
+    return " ".join(words)
 
 
 def _suffix(ticker: str) -> str:
@@ -171,8 +174,8 @@ def _suffix(ticker: str) -> str:
 def dedupe_listings(opportunities: list, keep: set = frozenset()) -> tuple[list, dict]:
     """
     Keep one listing per company. Preference: a listing you hold, then the curated
-    watchlist, then the home-market listing (exchange country = company country),
-    then the most traded. Returns (opportunities, {dropped ticker: kept ticker}).
+    watchlist, then one you can trade at your brokers, then the home-market listing
+    (exchange country = company country), then the most traded. Returns (opportunities, {dropped ticker: kept ticker}).
     """
     groups = {}
     for o in opportunities:
@@ -187,9 +190,10 @@ def dedupe_listings(opportunities: list, keep: set = frozenset()) -> tuple[list,
             continue
 
         def rank(o):
+            from src.data_quality import tradability
             home = SUFFIX_COUNTRY.get(_suffix(o.ticker)) == (o.country or "")
-            return (o.ticker in keep or bool(o.portfolio), o.ticker in config.CURATED_WATCHLIST, home,
-                    o.avg_volume or 0)
+            return (o.ticker in keep or bool(o.portfolio), o.ticker in config.CURATED_WATCHLIST,
+                    tradability(o.ticker) == "Yes", home, o.avg_volume or 0)
         group.sort(key=rank, reverse=True)
         best = group[0]
         kept.append(best)
