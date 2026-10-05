@@ -112,3 +112,31 @@ tbody tr:hover { background: var(--surface-2); }
   .alerts li { grid-template-columns: 1fr; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+/* Sell review */
+.sell-list { display: grid; gap: 12px; }
+.sell-card { background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--border);
+  border-radius: var(--radius); padding: 14px 16px; display: grid; gap: 10px; min-width: 0; }
+.sell-card.stop { border-left-color: var(--bad); }
+.sell-card.protect { border-left-color: var(--warn); }
+.sell-card.profit, .sell-card.trim { border-left-color: var(--good); }
+.sell-card.data { border-left-color: var(--muted); }
+.sell-card.shariah { border-left-color: var(--info); }
+.sell-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; }
+.sell-head h3 { margin: 0; font-size: 17px; }
+.sell-head .facts { color: var(--muted); font-variant-numeric: tabular-nums; }
+.sell-action { font-size: 16px; font-weight: 650; }
+.sell-action .est { font-weight: 400; color: var(--muted); }
+.sell-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px 24px; }
+.sell-cols h4 { margin: 0 0 4px; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.sigs { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.sigs li { display: grid; grid-template-columns: auto 1fr; gap: 8px; align-items: baseline; overflow-wrap: anywhere; }
+.dots { font-size: 10px; letter-spacing: 1px; color: var(--bad); min-width: 30px; }
+.dots.profit, .dots.trim { color: var(--good); } .dots.shariah { color: var(--info); } .dots.keep { color: var(--good); }
+.levels { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; font-variant-numeric: tabular-nums; }
+.levels span b { font-weight: 600; }
+.sell-notes { margin: 0; padding-left: 18px; color: var(--muted); font-size: 13px; }
+.chip.stop { background: var(--bad-soft); color: var(--bad); }
+.chip.protect { background: var(--warn-soft); color: var(--warn); }
+.chip.profit, .chip.trim { background: var(--good-soft); color: var(--good); }
+.chip.strong { background: var(--fg); color: var(--bg); }

@@ -13,6 +13,7 @@ from datetime import datetime
 import config
 from src.models import Opportunity, MacroContext
 from src.output_gate import find_violations
+from src.sell_review import tax_note
 
 _SPARK_DAYS = 126  # ~6 months of closes for the detail-page chart
 
@@ -42,6 +43,7 @@ def opportunity_row(opp: Opportunity, top10: set) -> dict:
         "eps_surprise": opp.eps_surprise, "finbert_score": opp.finbert_score,
         "short_pct_float": opp.short_pct_float, "universe_tags": opp.universe_tags,
         "thesis_status": opp.thesis_status, "thesis_notes": opp.thesis_notes,
+        "exit_metrics": opp.exit_metrics, "sell_review": opp.sell_review,
         "filings": opp.filings[:10],
         "news": [{k: n.get(k, "") for k in ("title", "source", "date", "url", "provider")} for n in opp.news[:8]],
         "history": [round(p, 4) for p in opp.hist_prices[-_SPARK_DAYS:]],
@@ -50,7 +52,7 @@ def opportunity_row(opp: Opportunity, top10: set) -> dict:
 
 def build_payload(opportunities: list[Opportunity], macro: MacroContext, *, health, fx, exposure: dict,
                   unpriced: list, top10: list, alerts: list, changes: list, purification_rows: list,
-                  broker_diffs, scorecard: dict, now: datetime = None) -> dict:
+                  broker_diffs, scorecard: dict, sell_rows: list = None, now: datetime = None) -> dict:
     now = now or datetime.now()
     top = {o.ticker for o in top10}
     rows = [opportunity_row(o, top) for o in opportunities
@@ -80,6 +82,11 @@ def build_payload(opportunities: list[Opportunity], macro: MacroContext, *, heal
             "scorecard": scorecard,
         },
         "opportunities": rows,
+        "sell_review": [r for r in (sell_rows or []) if r["ticker"] not in config.AVOID_LIST],
+        "tax_residence": config.TAX_RESIDENCE,
+        "sell_notes": [config.BROKER_COST_NOTE, tax_note()],
+        "sell_settings": {"stop_loss_pct": config.SELL_STOP_LOSS_PCT, "take_profit_pct": config.SELL_TAKE_PROFIT_PCT,
+                          "strong_score": config.SELL_STRONG_SCORE, "position_cap_pct": config.POSITION_CAP_PCT},
         "alerts": alerts,
         "changes": changes,
         "disclaimer": "Not financial advice. Check prices on your broker before acting.",
@@ -96,6 +103,8 @@ def write_latest(payload: dict, path: str = None) -> tuple[str, int]:
         payload["opportunities"] = [r for r in payload["opportunities"]
                                     if not find_violations(json.dumps(r, default=str))]
         payload["alerts"] = [a for a in payload["alerts"] if not find_violations(json.dumps(a))]
+        payload["sell_review"] = [r for r in payload.get("sell_review", [])
+                                  if not find_violations(json.dumps(r, default=str))]
         text = json.dumps(payload, default=str)
     os.makedirs(os.path.dirname(path), exist_ok=True)
     tmp = path + ".tmp"

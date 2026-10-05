@@ -257,6 +257,14 @@ SCORECARD_BENCHMARK   = "ISWD.L"   # iShares MSCI World Islamic (must also be in
 TAX_RESIDENCE = ""     # e.g. "NL" — loss-harvesting rules differ by country
 BROKER_COST_NOTE = "Check your broker's fee and FX-conversion cost — on small positions they can exceed the gain."
 
+# ── Sell review tab (holdings) ────────────────────────
+SELL_STOP_LOSS_PCT   = ALERT_PORTFOLIO_LOSS   # % vs breakeven — strong "stop the loss" signal
+SELL_TAKE_PROFIT_PCT = 50.0    # % vs breakeven — "take profit" signal (twice this = stronger)
+SELL_STRONG_SCORE    = 4       # summed signal strength for "Strong" (sell all / a third) vs "Consider"
+TRAIL_STOP_VOL_MULT  = 2.0     # trailing stop distance = this × one-month volatility ...
+TRAIL_STOP_MIN_PCT   = 12.0    # ... but at least this far below the 6-month high
+TRAIL_STOP_MAX_PCT   = 30.0    # ... and at most this far
+
 # ── Sell discipline (holdings without an entry in data/theses.json) ──
 DEFAULT_THESIS_RULES = {
     "invalidation": [{"type": "shariah_is", "value": "No"}],

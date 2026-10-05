@@ -179,6 +179,9 @@ class Opportunity:
     universe_tags: list = field(default_factory=list)
     # Portfolio holding (if this ticker is in user's portfolio)
     portfolio: Optional[PortfolioHolding] = None
+    # Sell review (holdings only): price facts for exits and the verdict
+    exit_metrics: dict = field(default_factory=dict)   # drawdown from 6m high, trailing stop, 3m return
+    sell_review: dict = field(default_factory=dict)    # {category, strength, action}
     # Pipeline outputs
     analysis: Optional[AnalysisResult] = None
     risk: Optional[RiskProfile] = None

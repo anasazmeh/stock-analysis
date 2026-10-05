@@ -59,6 +59,7 @@ def create_app(report_dir: str = None, runs_dir: str = None, run_cmd: list = Non
         alerts = (data or {}).get("alerts", [])
         return {
             "nav_alert_count": sum(1 for a in alerts if a["level"] in ("DANGER", "BUY")),
+            "nav_sell_count": sum(1 for r in (data or {}).get("sell_review", []) if r.get("strength") == "Strong"),
             "run_at": (data or {}).get("run_at", ""),
             "degraded": (data or {}).get("degraded", False),
             "degraded_reasons": (data or {}).get("degraded_reasons", []),
@@ -124,6 +125,21 @@ def create_app(report_dir: str = None, runs_dir: str = None, run_cmd: list = Non
             "currencies": data["portfolio"].get("currencies") or {},
         }
         return render_template("portfolio.html", d=data, holdings=holdings, chart=chart)
+
+    @app.route("/sell")
+    def sell():
+        data = load_latest()
+        if not data:
+            return empty()
+        rows = data.get("sell_review", [])
+        act = [r for r in rows if r.get("strength")]
+        strong = [r for r in act if r["strength"] == "Strong"]
+        totals = {"proceeds": sum(r.get("proceeds_eur") or 0 for r in strong),
+                  "realised": sum(r.get("realised_pl_eur") or 0 for r in strong)}
+        return render_template("sell.html", d=data, rows=rows, act=act, strong=strong, totals=totals,
+                               review=[r for r in rows if not r.get("strength") and r["category"] != "Hold"],
+                               holds=[r for r in rows if r["category"] == "Hold"],
+                               unpriced=data["portfolio"].get("unpriced") or [])
 
     @app.route("/opportunities")
     def opportunities():

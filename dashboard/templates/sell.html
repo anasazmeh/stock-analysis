@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% from "_macros.html" import pl, trend %}
+{% block title %}Sell review · Portfolio Desk{% endblock %}
+{% set CLS = {'Stop the loss': 'stop', 'Protect gains': 'protect', 'Take profit': 'profit', 'Trim to cap': 'trim',
+              'Check data first': 'data', 'Shariah review': 'shariah'} %}
+{% set SIDE = {'stop': 'sell', 'profit': 'profit', 'trim': 'cap', 'shariah': 'shariah'} %}
+
+{% macro card(r) %}
+{% set m = r.metrics or {} %}
+<article class="sell-card {{ CLS.get(r.category, '') }}">
+  <div class="sell-head">
+    <h3><a href="{{ url_for('stock', ticker=r.ticker) }}">{{ r.ticker }}</a> <span class="muted" style="font-weight:400">{{ r.name }}</span></h3>
+    <span class="chip {{ CLS.get(r.category, 'muted') }}">{{ r.category }}</span>
+    {% if r.strength %}<span class="chip {{ 'strong' if r.strength == 'Strong' else 'muted' }}">{{ r.strength }}</span>{% endif %}
+    <span class="facts">P&amp;L {{ pl(r.pl_pct) }} · {{ r.pl_value_eur | eur(True) }} · {{ r.weight_pct | pct(False) }} of portfolio · {{ trend(r.trend) }}</span>
+  </div>
+
+  {% if r.category == 'Check data first' %}
+    <div class="sell-action">No suggestion until the data is fixed</div>
+    <ul class="list">{% for p in r.problems %}<li>{{ p }}</li>{% endfor %}</ul>
+  {% else %}
+    <div class="sell-action">{{ r.action }}{% if r.sell_units %}
+      <span class="est">· ≈ {{ r.proceeds_eur | eur }} at {{ r.price | num }} {{ r.currency }}{% if r.realised_pl_eur is not none %}, realises ≈ {{ r.realised_pl_eur | eur(True) }}{% endif %}</span>{% endif %}</div>
+    <div class="sell-cols">
+      <div><h4>Reasons to sell</h4>
+        <ul class="sigs">{% for s in r.signals %}<li><span class="dots {{ s.side }}" title="{{ SIDE[s.side] }} · strength {{ s.strength }} of 3">{{ '●' * s.strength }}{{ '○' * (3 - s.strength) }}</span><span>{{ s.text }}</span></li>{% else %}<li class="muted">None</li>{% endfor %}</ul></div>
+      <div><h4>Reasons to keep</h4>
+        <ul class="sigs">{% for k in r.keep %}<li><span class="dots keep">✓</span><span>{{ k }}</span></li>{% else %}<li class="muted">None found</li>{% endfor %}</ul></div>
+    </div>
+    {% if m %}<div class="levels">
+      {% if m.high_6m %}<span>6-month high <b>{{ m.high_6m | num }}</b> ({{ m.drawdown_from_high_pct | pct }})</span>{% endif %}
+      {% if m.trail_stop_price %}<span>Trailing stop <b>{{ m.trail_stop_price | num }}</b> ({{ m.trail_stop_pct }}% below the high){% if m.trail_stop_hit %} <span class="chip bad">hit</span>{% endif %}</span>{% endif %}
+      {% if m.return_3m_pct is not none %}<span>3 months <b>{{ m.return_3m_pct | pct }}</b></span>{% endif %}
+      {% if m.vs_ma200_pct is not none %}<span>vs 200-day <b>{{ m.vs_ma200_pct | pct }}</b></span>{% endif %}
+    </div>{% endif %}
+    {% if r.notes %}<ul class="sell-notes">{% for n in r.notes %}<li>{{ n }}</li>{% endfor %}</ul>{% endif %}
+  {% endif %}
+</article>
+{% endmacro %}
+
+{% block content %}
+{% set ss = d.sell_settings or {'stop_loss_pct': -20, 'take_profit_pct': 50, 'strong_score': 4, 'position_cap_pct': 12} %}
+<section>
+  <h1>Sell review</h1>
+  <p class="sub">Each holding checked for reasons to cut a loss, protect a gain, take profit or trim to the {{ ss.position_cap_pct | num(0) }}% cap.
+    Estimates use this run's price and ECB rates, before fees and tax. Shariah status is listed but never changes a verdict.</p>
+</section>
+
+<section class="kpis">
+  <div class="kpi"><div class="label">Act now</div><div class="value">{{ strong | length }}</div><div class="muted">strong signals</div></div>
+  <div class="kpi"><div class="label">Consider</div><div class="value">{{ (act | length) - (strong | length) }}</div><div class="muted">weaker signals</div></div>
+  <div class="kpi"><div class="label">Strong sales would free</div><div class="value">{{ totals.proceeds | eur }}</div>
+    <div class="muted">realising {{ totals.realised | eur(True) }}</div></div>
+  <div class="kpi"><div class="label">No signal</div><div class="value">{{ holds | length }}</div><div class="muted">of {{ rows | length }} holdings</div></div>
+</section>
+
+{% if act and d.sell_notes %}
+<section class="panel" style="border-color: var(--warn)"><h2>Before you sell</h2>
+  <ul class="list">{% for n in d.sell_notes %}<li>{{ n }}</li>{% endfor %}</ul></section>
+{% endif %}
+
+{% if act %}
+<section><h2>Sell signals</h2><div class="sell-list">{% for r in act %}{{ card(r) }}{% endfor %}</div></section>
+{% else %}
+<section class="panel"><p>No holding has a sell signal this run.</p></section>
+{% endif %}
+
+{% if review %}
+<section><h2>Needs your judgement</h2><div class="sell-list">{% for r in review %}{{ card(r) }}{% endfor %}</div></section>
+{% endif %}
+
+{% if holds %}
+<section class="panel">
+  <h2>No sell signal</h2>
+  <div class="table-wrap"><table class="sortable">
+    <thead><tr><th data-sort>Ticker</th><th data-sort class="num">P&amp;L</th><th data-sort class="num">Weight</th><th data-sort>Trend</th>
+      <th data-sort class="num">From 6-month high</th><th data-sort class="num">Trailing stop</th><th class="wrap">Reasons to keep</th></tr></thead>
+    <tbody>{% for r in holds %}{% set m = r.metrics or {} %}
+      <tr><td><a href="{{ url_for('stock', ticker=r.ticker) }}"><strong>{{ r.ticker }}</strong></a></td>
+        <td class="num" data-value="{{ r.pl_pct }}">{{ pl(r.pl_pct) }}</td>
+        <td class="num" data-value="{{ r.weight_pct or '' }}">{{ r.weight_pct | pct(False) }}</td>
+        <td>{{ trend(r.trend) }}</td>
+        <td class="num" data-value="{{ m.drawdown_from_high_pct if m.drawdown_from_high_pct is not none else '' }}">{{ m.drawdown_from_high_pct | pct }}</td>
+        <td class="num">{{ m.trail_stop_price | num }}</td>
+        <td class="wrap muted">{{ r.keep | join(' · ') or '–' }}</td></tr>
+    {% endfor %}</tbody>
+  </table></div>
+</section>
+{% endif %}
+
+{% if unpriced %}
+<section class="panel">
+  <h2>Not reviewed</h2>
+  <ul class="list">{% for h in unpriced %}<li><strong>{{ h.name }}</strong> — {{ h.note }}</li>{% endfor %}</ul>
+</section>
+{% endif %}
+
+<section class="panel">
+  <h2>How the verdicts work</h2>
+  <ul class="list">
+    <li><strong>Stop the loss</strong> / <strong>Protect gains</strong>: loss past {{ ss.stop_loss_pct | num(0) }}%, a broken trend, the trailing stop hit, a broken thesis, analyst downgrades, insider selling or SEC red flags. Called "protect gains" when you are still in profit.</li>
+    <li><strong>Take profit</strong>: a gain of {{ ss.take_profit_pct | num(0) }}% or more, price at or above the analyst target, or overbought. Suggests selling a quarter to a third and letting the rest run.</li>
+    <li><strong>Trim to cap</strong>: the position is above the {{ ss.position_cap_pct | num(0) }}% cap. Suggests the sale that brings it back to the cap.</li>
+    <li>The trailing stop sits twice the stock's normal one-month swing below its 6-month high (2 × one-month volatility, kept between 12% and 30%).</li>
+    <li>Dots show how strong each reason is (●●● strongest). "Strong" means the reasons add up to {{ ss.strong_score }} or more.</li>
+    <li>Holdings with a price or data problem get no suggestion until it's fixed.</li>
+  </ul>
+</section>
+{% endblock %}

@@ -19,7 +19,7 @@ python3 main.py
 | `python3 main.py --no-ai` | Skip the Claude analysis |
 | `python3 main.py --no-cache` | Ignore cached data |
 | `python3 main.py --ipo "SpaceX" --broker-price 162 --amount 2000` | IPO dossier with labelled offer / market / broker prices |
-| `python3 dashboard/app.py` | Web dashboard at http://127.0.0.1:8050 (portfolio, opportunities, stock pages, history, "Refresh data" button) |
+| `python3 dashboard/app.py` | Web dashboard at http://127.0.0.1:8050 (portfolio, opportunities, sell review, stock pages, history, "Refresh data" button) |
 | `bash scripts/setup_schedule.sh` | Email alerts + weekday cron job (asks, sends a test email, installs; `--remove` to stop) |
 | `scripts/run_daily.sh` | Scheduled run (reads `.env`, logs to `logs/`, emails you if a run crashes, optional health-check pings) |
 | `python3 -m src.alerts --test` | Send a test alert to the configured email / webhook |
@@ -35,7 +35,8 @@ Exit codes: `0` ok · `2` degraded data · `1` avoid-list leak or missing requir
 5. **News and macro** — Yahoo, Finnhub, Google News, GDELT, NewsAPI; deduplicated, full text scored by FinBERT; FRED indicators.
 6. **Risk, trend, regulatory watch, exposure, thesis rules, event calendar.**
 7. **Claude analysis** via your logged-in Claude Code (`claude -p`, no API key) on a dated evidence pack (cites the facts it used, says when data is insufficient).
-8. **Report, run snapshot, decision journal, alerts.**
+8. **Sell review** — per holding: stop the loss / protect gains / take profit / trim to cap, from the loss vs breakeven, a volatility-based trailing stop off the 6-month high, trend, thesis, analyst target and revisions, insiders, SEC red flags and Claude's holder view; suggests how many shares and the euro proceeds. Holdings with bad data get no suggestion; Shariah is listed, never scored. Thresholds: `SELL_*` / `TRAIL_STOP_*` in `config.py`.
+9. **Report, run snapshot, decision journal, alerts.**
 
 ## Your files
 

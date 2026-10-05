@@ -14,6 +14,7 @@ config.CACHE_DIR = tempfile.mkdtemp()
 
 from dashboard.app import create_app  # noqa: E402
 from src import dashboard_data, portfolio  # noqa: E402
+from src.sell_review import apply_exit_metrics, review_holdings  # noqa: E402
 from src.data_quality import RunHealth  # noqa: E402
 from src.fx import parse_ecb_xml  # noqa: E402
 from src.models import (Opportunity, PortfolioHolding, ShariahStatus, RiskProfile, AnalysisResult,  # noqa: E402
@@ -58,6 +59,8 @@ def sample_payload():
     opps[3].data_ok = False
     opps[3].data_flags = ["stale quote"]
     exp = portfolio.exposure(opps)
+    apply_exit_metrics(opps)
+    sell_rows = review_holdings(opps, FX)
     top10 = [o for o in opps if o.data_ok]
     macro = MacroContext(regime="neutral", themes=["AI capex", "Rates on hold"], vix=17.2, eurusd=1.15,
                          events=[{"date": "2026-10-28", "name": "FOMC decision"}],
@@ -77,6 +80,7 @@ def sample_payload():
                                                                     "amount": 0.01, "amount_eur": 0.01})],
         broker_diffs=None, scorecard={"since": "2026-09-01", "portfolio_pct": 4.0, "benchmark_pct": 2.5,
                                       "benchmark": "ISWD.L", "difference_pts": 1.5},
+        sell_rows=sell_rows,
         now=datetime(2026, 10, 3, 7, 0))
 
 
@@ -95,7 +99,8 @@ class DashboardTests(unittest.TestCase):
     def test_pages_render(self):
         for path, needle in [("/", "Top 10 opportunities"), ("/portfolio", "iShares Nasdaq-100"),
                              ("/opportunities", "Regional heatmap"), ("/stock/NVDA", "NVIDIA example thesis"),
-                             ("/history", "Portfolio vs MSCI World Islamic")]:
+                             ("/history", "Portfolio vs MSCI World Islamic"),
+                             ("/sell", "Trim to cap")]:
             r = self.client.get(path)
             self.assertEqual(r.status_code, 200, path)
             self.assertIn(needle, r.get_data(as_text=True), path)
@@ -104,6 +109,15 @@ class DashboardTests(unittest.TestCase):
         html = self.client.get("/").get_data(as_text=True)
         self.assertIn('class="badge"', html)
         self.assertIn("Not financial advice", html)
+
+    def test_sell_review_page(self):
+        html = self.client.get("/sell").get_data(as_text=True)
+        self.assertIn("NVDA", html)
+        self.assertIn("Reasons to keep", html)
+        self.assertIn("iShares Nasdaq-100", html)       # unpriced funds listed as not reviewed
+        data = self.client.get("/api/latest").get_json()
+        nvda = next(r for r in data["sell_review"] if r["ticker"] == "NVDA")
+        self.assertEqual(nvda["category"], "Trim to cap")
 
     def test_unknown_stock_404(self):
         self.assertEqual(self.client.get("/stock/ZZZZ").status_code, 404)
