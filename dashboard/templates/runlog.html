@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Refresh log · Portfolio Desk{% endblock %}
+{% block content %}
+<section>
+  <h1>Refresh log</h1>
+  <p class="sub">
+    {% if state.running %}Running for {{ (state.elapsed_s or 0) // 60 }} min {{ (state.elapsed_s or 0) % 60 }} s
+      (stopped automatically after {{ state.timeout_min }} min){% if state.stage %} · now: {{ state.stage }}{% endif %}.
+    {% elif state.finished %}Last run finished {{ state.finished | when }} — {{ {0: 'ok', 2: 'ok, some data missing', 'timeout': 'stopped: took too long', 'cancelled': 'cancelled'}.get(state.exit_code, 'failed (exit code ' ~ state.exit_code ~ ')') }}.
+    {% else %}No run started from the dashboard since it was last restarted.{% endif %}
+    The last {{ lines | length }} lines of <code>logs/dashboard_run.log</code>; reload to update.</p>
+</section>
+<section class="panel"><div class="table-wrap"><pre class="logbox">{% for l in lines %}{{ l }}
+{% else %}(empty){% endfor %}</pre></div></section>
+{% endblock %}

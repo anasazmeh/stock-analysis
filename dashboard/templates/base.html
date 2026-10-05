@@ -29,6 +29,7 @@
       <span>{% if run_at %}Last run {{ run_at | when }}{% else %}No run yet{% endif %}</span>
       <span id="refresh-status" aria-live="polite"></span>
       <button id="refresh-btn" type="button">Refresh data</button>
+      <button id="refresh-cancel" type="button" class="link" hidden>Cancel</button>
       {% if login_on %}<form method="post" action="{{ url_for('logout') }}" class="logout"><button type="submit" class="link">Log out</button></form>{% endif %}
     </div>
   </header>

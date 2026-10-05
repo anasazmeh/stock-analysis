@@ -208,13 +208,56 @@ def create_app(report_dir: str = None, runs_dir: str = None, run_cmd: list = Non
         from dashboard.auth import same_origin as check
         return check()
 
+    run_log = os.path.join(ROOT, "logs", "dashboard_run.log")
+    proc_box = {}
+
     def run_pipeline():
-        log_dir = os.path.join(ROOT, "logs")
-        os.makedirs(log_dir, exist_ok=True)
-        with open(os.path.join(log_dir, "dashboard_run.log"), "w") as log:
-            code = subprocess.call(app.config["RUN_CMD"], cwd=ROOT, stdout=log, stderr=subprocess.STDOUT)
+        import signal
+        os.makedirs(os.path.dirname(run_log), exist_ok=True)
+        timeout = app.config.get("REFRESH_TIMEOUT_MIN", config.REFRESH_TIMEOUT_MIN) * 60
+        with open(run_log, "w") as log:
+            # Own process group, so a timeout or Cancel also stops the claude calls it started.
+            proc = subprocess.Popen(app.config["RUN_CMD"], cwd=ROOT, stdout=log, stderr=subprocess.STDOUT,
+                                    stdin=subprocess.DEVNULL, start_new_session=True)
+            proc_box["proc"] = proc
+            if run_state.get("cancelled"):   # Cancel pressed before the process existed
+                os.killpg(proc.pid, signal.SIGTERM)
+            try:
+                code = proc.wait(timeout=timeout)
+            except subprocess.TimeoutExpired:
+                os.killpg(proc.pid, signal.SIGTERM)
+                try:
+                    proc.wait(timeout=20)
+                except subprocess.TimeoutExpired:
+                    os.killpg(proc.pid, signal.SIGKILL)
+                    proc.wait()
+                code = "timeout"
+        if run_state.get("cancelled"):
+            code = "cancelled"
         with lock:
             run_state.update(running=False, finished=datetime.now().isoformat(timespec="seconds"), exit_code=code)
+        proc_box.pop("proc", None)
+
+    def log_tail(n=60) -> list:
+        from src.output_gate import scrub
+        try:
+            with open(run_log, encoding="utf-8", errors="replace") as f:
+                lines = f.read().splitlines()[-n:]
+        except OSError:
+            return []
+        return scrub("\n".join(lines))[0].splitlines()
+
+    def progress() -> dict:
+        lines = log_tail(400)
+        stage = next((l.strip() for l in reversed(lines) if "Stage" in l), "")
+        last = next((l.strip() for l in reversed(lines) if l.strip()), "")
+        out = {**run_state, "stage": stage[:120], "last_line": last[:160]}
+        if run_state.get("started"):
+            end = datetime.fromisoformat(run_state["finished"]) if run_state.get("finished") and not run_state["running"] \
+                else datetime.now()
+            out["elapsed_s"] = int((end - datetime.fromisoformat(run_state["started"])).total_seconds())
+        out["timeout_min"] = app.config.get("REFRESH_TIMEOUT_MIN", config.REFRESH_TIMEOUT_MIN)
+        return out
 
     @app.route("/refresh", methods=["POST"])
     def refresh():
@@ -222,16 +265,36 @@ def create_app(report_dir: str = None, runs_dir: str = None, run_cmd: list = Non
             abort(403)
         with lock:
             if run_state["running"]:
-                return jsonify(run_state), 409
+                return jsonify(progress()), 409
             run_state.update(running=True, started=datetime.now().isoformat(timespec="seconds"),
-                             finished=None, exit_code=None)
+                             finished=None, exit_code=None, cancelled=False)
         threading.Thread(target=run_pipeline, daemon=True).start()
-        return jsonify(run_state), 202
+        return jsonify(progress()), 202
+
+    @app.route("/refresh/cancel", methods=["POST"])
+    def refresh_cancel():
+        import signal
+        if not same_origin():
+            abort(403)
+        if not run_state["running"]:
+            return jsonify(progress()), 409
+        run_state["cancelled"] = True
+        proc = proc_box.get("proc")
+        if proc is not None:
+            try:
+                os.killpg(proc.pid, signal.SIGTERM)
+            except ProcessLookupError:
+                pass
+        return jsonify(progress()), 202
 
     @app.route("/refresh/status")
     def refresh_status():
         with lock:
-            return jsonify(run_state)
+            return jsonify(progress())
+
+    @app.route("/refresh/log")
+    def refresh_log():
+        return render_template("runlog.html", lines=log_tail(200), state=progress())
 
     from dashboard import auth
     auth.install(app, **(auth_options or {}))

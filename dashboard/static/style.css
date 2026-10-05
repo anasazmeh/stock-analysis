@@ -44,7 +44,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 .nav a.active, .nav a:hover { background: var(--surface-2); color: var(--fg); text-decoration: none; }
 .badge { display: inline-block; min-width: 18px; padding: 0 6px; margin-left: 4px; border-radius: 9px;
   background: var(--bad); color: #fff; font-size: 11px; text-align: center; font-weight: 600; }
-.runinfo { margin-left: auto; display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: 13px; }
+.runinfo { margin-left: auto; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; color: var(--muted); font-size: 13px; min-width: 0; max-width: 100%; }
 button, .btn { font: inherit; padding: 6px 12px; border-radius: 6px; border: 1px solid var(--accent);
   background: var(--accent); color: #fff; cursor: pointer; }
 button:disabled { opacity: .6; cursor: progress; }
@@ -172,3 +172,9 @@ tbody tr:hover { background: var(--surface-2); }
 .login-error { margin: 0; padding: 8px 10px; border-radius: 6px; background: var(--bad-soft); color: var(--bad); }
 form.logout { display: inline; margin: 0; }
 button.link { background: none; border: 0; padding: 0 4px; color: var(--muted); font: inherit; cursor: pointer; text-decoration: underline; }
+
+/* Refresh progress + log */
+.logbox { margin: 0; font: 12px/1.45 var(--mono); white-space: pre; color: var(--fg); }
+#refresh-status { font-size: 13px; color: var(--muted); max-width: min(46ch, 100%); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#refresh-status a { color: inherit; }
+#refresh-cancel[hidden] { display: none !important; }

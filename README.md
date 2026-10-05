@@ -33,6 +33,7 @@ The dashboard keeps running on your Mac (where Claude Code is logged in) behind 
 JSON API and **Refresh data** need login; 5 wrong tries lock that address for 15 minutes; login lasts 30 days
 per device. [Tailscale](https://tailscale.com) (free) gives your devices an encrypted https address; the dashboard
 itself only listens on 127.0.0.1. The Mac must be on and awake (the script keeps it awake while plugged in).
+**Refresh data** shows the elapsed time and current stage, has a Cancel button and a log page (`/refresh/log`); a run is stopped after `REFRESH_TIMEOUT_MIN` (60). A full run takes several minutes — Claude reviews up to `AI_MAX_TICKERS` stocks, `AI_PARALLEL` calls at a time.
 `--private` removes the public link, `--stop` turns remote access off. On the phone, *Add to Home Screen* opens it like an app.
 
 Logs: every run started from a terminal is saved to `logs/run_YYYY-MM-DD_HHMMSS.log` (newest 30 kept); scheduled runs write `logs/run_YYYY-MM-DD.log`, and the dashboard's Refresh button writes `logs/dashboard_run.log`.
