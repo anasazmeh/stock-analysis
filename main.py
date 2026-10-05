@@ -133,10 +133,15 @@ def main() -> int:
     # ── 2. Market data, FX, price check, data-quality gate ───────────────
     print("📊 Stage 2: Fetching market data...")
     opportunities, benchmarks = enrich_tickers(tickers)
+    from src.symbols import dedupe_listings
+    opportunities, duplicates = dedupe_listings(opportunities, keep=held)
+    SYMBOLS["duplicates"] = duplicates
     priced = [o for o in opportunities if o.price > 0]
     mark_failed([o.ticker for o in opportunities if o.price <= 0 and o.ticker not in held])
     HEALTH.record("Symbol lookup", "partial" if SYMBOLS["missing"] else "ok",
                   "; ".join([f"{a} → {b}" for a, b in SYMBOLS["resolved"].items()]
+                            + ([f"duplicate listings dropped: {', '.join(f'{a} (= {b})' for a, b in SYMBOLS['duplicates'].items())}"]
+                               if SYMBOLS.get("duplicates") else [])
                             + ([f"not on Yahoo: {', '.join(SYMBOLS['missing'])}"] if SYMBOLS["missing"] else []))
                   or "all symbols found")
     HEALTH.record("Yahoo Finance", _status(len(priced), len(opportunities)), f"{len(priced)}/{len(opportunities)} priced")

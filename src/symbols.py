@@ -143,3 +143,61 @@ def mark_failed(tickers: list[str]):
     for t in tickers:
         cache.invalidate(f"symbol:v1:{t}")
         cache.set(f"symbol:v1:{t}:checked", {"failed": True})
+
+
+# ── One listing per company ───────────────────────────────────────────────
+# Regional screens sort by market value, so the "largest German companies" include
+# US giants' German secondary lines (Apple as APC.F on Frankfurt and APC.DE on Xetra).
+# Same company, same shares — they must not take several Top 10 places.
+SUFFIX_COUNTRY = {"": "United States", ".DE": "Germany", ".F": "Germany", ".PA": "France", ".AS": "Netherlands",
+                  ".L": "United Kingdom", ".SR": "Saudi Arabia", ".AE": "United Arab Emirates", ".AD": "United Arab Emirates",
+                  ".HK": "Hong Kong", ".T": "Japan", ".KS": "South Korea", ".NS": "India", ".MI": "Italy", ".MC": "Spain",
+                  ".SW": "Switzerland", ".TO": "Canada", ".BR": "Belgium", ".CO": "Denmark", ".ST": "Sweden", ".OL": "Norway"}
+_LEGAL = re.compile(r"\b(inc|incorporated|corp|corporation|co|company|plc|ag|se|sa|nv|n\.v|ltd|limited|holdings?|group|"
+                    r"class [a-c]|cl [a-c]|the|adr|ads|reg|registered|shares?|ord|common)\b\.?")
+
+
+def company_key(name: str) -> str:
+    n = (name or "").lower().replace("&", " and ")
+    n = _LEGAL.sub(" ", n)
+    n = re.sub(r"[^a-z0-9 ]", " ", n)
+    return re.sub(r"\s+", " ", n).strip()
+
+
+def _suffix(ticker: str) -> str:
+    return "." + ticker.rpartition(".")[2].upper() if "." in ticker else ""
+
+
+def dedupe_listings(opportunities: list, keep: set = frozenset()) -> tuple[list, dict]:
+    """
+    Keep one listing per company. Preference: a listing you hold, then the curated
+    watchlist, then the home-market listing (exchange country = company country),
+    then the most traded. Returns (opportunities, {dropped ticker: kept ticker}).
+    """
+    groups = {}
+    for o in opportunities:
+        key = company_key(o.name) if o.price > 0 else ""
+        if not key or key == company_key(o.ticker):
+            key = "ticker:" + o.ticker
+        groups.setdefault(key, []).append(o)
+    kept, dropped = [], {}
+    for group in groups.values():
+        if len(group) == 1:
+            kept += group
+            continue
+
+        def rank(o):
+            home = SUFFIX_COUNTRY.get(_suffix(o.ticker)) == (o.country or "")
+            return (o.ticker in keep or bool(o.portfolio), o.ticker in config.CURATED_WATCHLIST, home,
+                    o.avg_volume or 0)
+        group.sort(key=rank, reverse=True)
+        best = group[0]
+        kept.append(best)
+        for o in group[1:]:
+            if o.ticker in keep or o.portfolio:     # never drop something you hold
+                kept.append(o)
+            else:
+                dropped[o.ticker] = best.ticker
+    if dropped:
+        print("  [symbols] same company, one listing kept: " + ", ".join(f"{a} → {b}" for a, b in dropped.items()))
+    return kept, dropped
