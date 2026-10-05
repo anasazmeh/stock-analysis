@@ -149,57 +149,58 @@ def _sector_weights(opportunities: list[Opportunity]) -> dict:
 
 
 def eligible_ideas(opportunities: list[Opportunity], sold: set, sectors: dict) -> tuple[list, list]:
-    """Return (ideas, near_misses). Each idea carries a score and the reasons it qualified."""
+    """
+    Walk the Opportunities tab's Top 10 in rank order. Return (ideas, top10_status):
+    ideas are the Top 10 names that pass the buy checks, still in rank order and
+    weighted by the same rank score; top10_status says for every Top 10 name what
+    the plan does with it and why.
+    """
     from src.events import earnings_blackout
-    ideas, misses = [], []
-    for o in opportunities:
-        if o.ticker in config.AVOID_LIST or o.ticker in sold or o.price <= 0:
-            continue
+    from src.ranking import top_ranked
+    ideas, status = [], []
+    for rank, o in enumerate(top_ranked(opportunities, 10), 1):
         a = o.analysis if o.analysis and o.analysis.status == "OK" else None
-        ai_buy = bool(a and (a.new_buyer_action == "BUY" or a.holder_action == "ADD"))
         up = o.adj_upside
         why_not = []
-        if not o.data_ok or o.price_check == "Mismatch":
-            why_not.append("data not verified")
+        if o.ticker in config.AVOID_LIST:
+            continue
+        if o.ticker in sold:
+            why_not.append("you're selling it in this plan")
+        if o.price_check == "Mismatch":
+            why_not.append("price check failed")
         if o.tradable != "Yes":
-            why_not.append("not tradable at your brokers")
+            why_not.append("not tradable at DEGIRO/Revolut")
         if a and a.new_buyer_action == "AVOID":
             why_not.append("Claude: avoid")
-        if a and not ai_buy:
-            why_not.append(f"Claude: {a.new_buyer_action.lower() or 'no buy'}")
+        elif a and a.new_buyer_action != "BUY" and a.holder_action != "ADD":
+            why_not.append(f"Claude: {(a.new_buyer_action or 'no buy').lower()} — not a buy yet")
         if not a and (up is None or up < config.REINVEST_MIN_UPSIDE):
-            why_not.append(f"upside below {config.REINVEST_MIN_UPSIDE:g}%")
+            why_not.append(f"upside below {config.REINVEST_MIN_UPSIDE:g}% (no Claude view)")
         if o.trend == "Downtrend":
-            why_not.append("downtrend")
-        if o.portfolio and (o.sell_review or {}).get("category") not in (None, "Hold"):
-            why_not.append(f"sell review: {o.sell_review['category']}")
+            why_not.append("in a downtrend")
+        if o.portfolio and (o.sell_review or {}).get("category") not in (None, "Hold", "Shariah review"):
+            why_not.append(f"Sell review says {o.sell_review['category'].lower()}")
         if config.REINVEST_SHARIAH_ONLY and (not o.shariah or o.shariah.compliant != "Yes"):
-            why_not.append("Shariah-only setting")
+            why_not.append("Shariah-only setting is on")
+        entry = {"rank": rank, "ticker": o.ticker, "name": o.name, "rank_score": o.rank_score,
+                 "shariah": o.shariah.compliant if o.shariah else "Unknown", "held": bool(o.portfolio)}
         if why_not:
-            if o.rank_score and (up or 0) > 0:
-                misses.append({"ticker": o.ticker, "name": o.name, "rank_score": o.rank_score, "why_not": why_not})
+            status.append({**entry, "outcome": "skip", "why": why_not})
             continue
-        conf = {"high": 1.0, "medium": 0.85, "low": 0.65}.get(a.confidence, 0.75) if a else 0.7
-        vol = o.risk.volatility_30d if o.risk and o.risk.volatility_30d else 35.0
         sector_w = sectors.get(o.sector or "Unknown", 0)
-        div = 0.5 if sector_w > config.SECTOR_SOFT_CAP_PCT else 1.15 if sector_w == 0 else 1.0
-        score = max(o.rank_score, 1) / 100 * conf * div / max(vol / 30, 0.5)
-        reasons = []
-        if ai_buy:
-            reasons.append(f"Claude: {'add' if o.portfolio else 'buy'} ({a.confidence} confidence)")
+        reasons = [f"#{rank} on Opportunities (score {o.rank_score:.1f})"]
+        if a:
+            reasons.append(f"Claude: {'add' if o.portfolio and a.holder_action == 'ADD' else 'buy'} ({a.confidence} confidence)")
         if up is not None:
-            reasons.append(f"{up:+.0f}% quality-adjusted upside ({o.analyst_count or '?'} analysts)")
-        if o.trend:
-            reasons.append(f"trend {o.trend.lower()}")
-        reasons.append(f"sector {o.sector}: {sector_w:.0f}% of your portfolio" + (" — new for you" if not sector_w else
-                       " — above the soft cap, half weight" if div < 1 else ""))
-        ideas.append({"ticker": o.ticker, "name": o.name, "opp": o, "score": score, "vol": vol, "reasons": reasons,
-                      "blackout": earnings_blackout(o), "next_event": o.next_event, "days_to_event": o.days_to_event,
-                      "shariah": o.shariah.compliant if o.shariah else "Unknown", "sector": o.sector,
+            reasons.append(f"{up:+.0f}% quality-adjusted upside")
+        if sector_w > config.SECTOR_SOFT_CAP_PCT:
+            reasons.append(f"note: {o.sector} is already {sector_w:.0f}% of your portfolio")
+        ideas.append({"ticker": o.ticker, "name": o.name, "opp": o, "score": max(o.rank_score, 1), "rank": rank,
+                      "reasons": reasons, "blackout": earnings_blackout(o), "next_event": o.next_event,
+                      "days_to_event": o.days_to_event, "shariah": entry["shariah"], "sector": o.sector,
                       "held": bool(o.portfolio), "rank_score": o.rank_score})
-    ideas.sort(key=lambda i: -i["score"])
-    misses.sort(key=lambda m: -m["rank_score"])
-    return ideas, misses[:8]
+        status.append({**entry, "outcome": "candidate", "why": []})
+    return ideas, status
 
 
 def _allocate(amount: float, ideas: list, exposure: dict, new_total: float, fx) -> tuple[list, float]:
@@ -330,10 +331,11 @@ def _reasoning(s: dict, market: dict, ideas: list) -> list:
     if s["shortfall_eur"] > 1:
         out.append(f"Your cash is €{s['shortfall_eur']:,.0f} below the target reserve, so nothing is reinvested in this scenario.")
     if s["buys"]:
-        out.append(f"{len(ideas)} idea(s) pass every check; the money goes to the best {len(s['buys'])}, weighted by rank score, "
-                   "confidence and lower volatility, with less for sectors you already hold a lot of.")
+        out.append(f"The buys follow the Top 10 on the Opportunities tab, in the same order: {len(ideas)} of them pass the buy checks "
+                   f"and the money goes to the first {len(s['buys'])}, in proportion to their rank score. "
+                   "The Top 10 table below shows why the others are skipped.")
     elif s["deployable_eur"] >= config.REINVEST_MIN_TICKET:
-        out.append("No opportunity passes every check this run, so the money stays in cash until one does. "
+        out.append("None of the Top 10 opportunities passes the buy checks this run, so the money stays in cash until one does. "
                    "Holding cash is a position too — it keeps your options open.")
     if s["unallocated_eur"] >= config.REINVEST_MIN_TICKET and s["buys"]:
         out.append(f"€{s['unallocated_eur']:,.0f} stays cash: the ideas that qualify are already at the "
@@ -387,9 +389,21 @@ def build_cash_plan(opportunities: list[Opportunity], sell_rows: list, macro: Ma
             "cash_balances": cash_balances(), "scenarios": []}
     for name, rows in (("Strong sell signals only", strong), ("Strong + Consider", strong + consider)):
         sold = {r["ticker"] for r in rows}
-        ideas, misses = eligible_ideas(opportunities, sold, sectors)
+        ideas, status = eligible_ideas(opportunities, sold, sectors)
         sc = _scenario(name, rows, ideas, market, exposure, fx, existing)
-        sc["ideas_count"], sc["near_misses"] = len(ideas), misses
+        bought = {b["ticker"]: b for b in sc["buys"]}
+        for st in status:
+            if st["outcome"] != "candidate":
+                continue
+            if st["ticker"] in bought:
+                st.update(outcome="buy", eur=bought[st["ticker"]]["eur"], units=bought[st["ticker"]]["units"])
+            elif sc["deployable_eur"] < config.REINVEST_MIN_TICKET:
+                st.update(outcome="wait", why=["no money left to invest after the cash reserve"])
+            elif st["rank"] > max([b["rank"] for b in sc["buys"]] + [0]) and len(sc["buys"]) >= config.REINVEST_MAX_IDEAS:
+                st.update(outcome="wait", why=[f"the plan spreads money over at most {config.REINVEST_MAX_IDEAS} ideas"])
+            else:
+                st.update(outcome="wait", why=["already at the position cap, or the amount is below the minimum ticket"])
+        sc["ideas_count"], sc["top10_status"] = len(ideas), status
         sc["reasoning"] = _reasoning(sc, market, ideas)
         plan["scenarios"].append(sc)
     plan["reasoning"] = plan["scenarios"][0]["reasoning"]

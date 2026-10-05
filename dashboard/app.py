@@ -176,7 +176,9 @@ def create_app(report_dir: str = None, runs_dir: str = None, run_cmd: list = Non
                  "avg_up": sum(v["ups"]) / len(v["ups"]) if v["ups"] else None,
                  "avg_risk": sum(v["risks"]) / len(v["risks"]) if v["risks"] else None,
                  "top": v["top"]["ticker"] if v["top"] else None} for k, v in sorted(regions.items())]
-        return render_template("opportunities.html", d=data, rows=rows, heat=heat,
+        plan = data.get("cash_plan") or {}
+        plan_status = {t["ticker"]: t for t in ((plan.get("scenarios") or [{}])[0].get("top10_status") or [])}
+        return render_template("opportunities.html", d=data, rows=rows, heat=heat, plan_status=plan_status,
                                regions=sorted(regions), shariah_values=["Yes", "Review", "Unknown", "No"])
 
     @app.route("/stock/<ticker>")

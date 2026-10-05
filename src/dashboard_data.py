@@ -108,7 +108,7 @@ def write_latest(payload: dict, path: str = None) -> tuple[str, int]:
             for sc in payload["cash_plan"]["scenarios"]:
                 sc["buys"] = [b for b in sc["buys"] if not find_violations(json.dumps(b, default=str))]
                 sc["sales"] = [b for b in sc["sales"] if not find_violations(json.dumps(b, default=str))]
-                sc["near_misses"] = [b for b in sc["near_misses"] if not find_violations(json.dumps(b, default=str))]
+                sc["top10_status"] = [b for b in sc.get("top10_status", []) if not find_violations(json.dumps(b, default=str))]
         payload["sell_review"] = [r for r in payload.get("sell_review", [])
                                   if not find_violations(json.dumps(r, default=str))]
         text = json.dumps(payload, default=str)

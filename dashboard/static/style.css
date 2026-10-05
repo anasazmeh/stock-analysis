@@ -50,6 +50,10 @@ button, .btn { font: inherit; padding: 6px 12px; border-radius: 6px; border: 1px
 button:disabled { opacity: .6; cursor: progress; }
 
 main { max-width: 1280px; margin: 0 auto; padding: 24px; display: grid; gap: 24px; }
+main > *, .scenario > * { min-width: 0; }
+.scenario { display: grid; gap: 24px; }
+ul.scenario { display: block; }
+[hidden] { display: none !important; }
 h1 { font-size: 22px; margin: 0; text-wrap: balance; }
 h2 { font-size: 15px; margin: 0 0 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
 .sub { color: var(--muted); margin: 4px 0 0; }
