@@ -25,13 +25,16 @@
       {% if base_keep > 0 %}<span class="keep" style="flex: {{ base_keep / total }}" title="Reserve {{ base_keep | eur }}">{% if base_keep / total > 0.08 %}Keep {{ (base_keep / total * 100) | round | int }}%{% endif %}</span>{% endif %}
       {% if s.tax_reserve_eur > 0 %}<span class="tax" style="flex: {{ s.tax_reserve_eur / total }}" title="Tax {{ s.tax_reserve_eur | eur }}">{% if s.tax_reserve_eur / total > 0.06 %}Tax{% endif %}</span>{% endif %}
       {% for b in s.buys %}<span class="buy" style="flex: {{ b.eur / total }}" title="{{ b.ticker }} {{ b.eur | eur }}">{% if b.eur / total > 0.06 %}{{ b.ticker }}{% endif %}</span>{% endfor %}
-      {% if s.unallocated_eur > 1 %}<span class="left" style="flex: {{ s.unallocated_eur / total }}" title="Not placed {{ s.unallocated_eur | eur }}">{% if s.unallocated_eur / total > 0.06 %}Cash{% endif %}</span>{% endif %}
+      {% set ready = s.ready_eur or 0 %}{% set idle = s.unallocated_eur - ready %}
+      {% if ready > 1 %}<span class="ready" style="flex: {{ ready / total }}" title="Kept ready {{ ready | eur }}">{% if ready / total > 0.06 %}Ready{% endif %}</span>{% endif %}
+      {% if idle > 1 %}<span class="left" style="flex: {{ idle / total }}" title="Held as cash {{ idle | eur }}">{% if idle / total > 0.06 %}Cash{% endif %}</span>{% endif %}
     </div>
     <div class="legend">
       <span><i style="background: var(--muted)"></i>Reserve{% if s.planned_withdrawals_eur %} + planned withdrawals{% endif %}</span>
       {% if s.tax_reserve_eur %}<span><i style="background: var(--warn)"></i>Tax on gains</span>{% endif %}
       <span><i style="background: var(--accent)"></i>Buys</span>
-      <span><i style="background: var(--info)"></i>No qualifying idea — stays cash</span>
+      {% if s.ready_eur %}<span><i style="background: var(--warn-soft); border: 1px solid var(--warn)"></i>Kept ready for names close to a buy</span>{% endif %}
+      <span><i style="background: var(--info)"></i>Held as cash</span>
     </div>
     {% else %}<p class="muted">No cash from sales or balances in this scenario.</p>{% endif %}
 
@@ -46,7 +49,8 @@
           {% if s.planned_withdrawals_eur %}<tr><td>Keep: planned withdrawals</td><td class="num">{{ s.planned_withdrawals_eur | eur }}</td></tr>{% endif %}
           <tr><td class="wrap">Keep: tax on gains ({{ (s.tax_rate * 100) | num(1) }}%{% if "unknown" in s.tax_rate_source %}, rate not set{% endif %})</td><td class="num">{{ s.tax_reserve_eur | eur }}</td></tr>
           <tr class="total"><td>Invest</td><td class="num">{{ s.invest_eur | eur }}</td></tr>
-          <tr><td>Not placed, stays cash</td><td class="num">{{ s.unallocated_eur | eur }}</td></tr>
+          {% if s.ready_eur %}<tr><td>Kept ready for names close to a buy</td><td class="num">{{ s.ready_eur | eur }}</td></tr>{% endif %}
+          <tr><td>Held as cash</td><td class="num">{{ (s.unallocated_eur - (s.ready_eur or 0)) | eur }}</td></tr>
         </tbody>
       </table></div>
       <div>
@@ -65,7 +69,7 @@
       <thead><tr><th data-sort>Ticker</th><th data-sort class="num">Shares</th><th data-sort class="num">≈ EUR</th><th data-sort class="num">Share</th>
         <th data-sort class="num">Weight after</th><th data-sort>Shariah</th><th>When</th><th class="wrap">Why</th></tr></thead>
       <tbody>{% for b in s.buys %}
-        <tr><td><a href="{{ url_for('stock', ticker=b.ticker) }}"><strong>{{ b.ticker }}</strong></a>{% if b.held %} <span class="chip info">add</span>{% endif %}<br><span class="muted">{{ b.name }}</span></td>
+        <tr><td>{% if b.parking %}<strong>{{ b.ticker }}</strong> <span class="chip muted">ETF</span>{% else %}<a href="{{ url_for('stock', ticker=b.ticker) }}"><strong>{{ b.ticker }}</strong></a>{% endif %}{% if b.held %} <span class="chip info">add</span>{% endif %}{% if b.second_line %} <span class="chip muted">next in line</span>{% endif %}<br><span class="muted">{{ b.name }}</span></td>
           <td class="num">{{ b.units | num(0 if b.units == (b.units | int) else 2) }}</td>
           <td class="num" data-value="{{ b.eur }}">{{ b.eur | eur }}<br><span class="muted">at {{ b.price | num }} {{ b.currency }}</span></td>
           <td class="num" data-value="{{ b.share_pct }}">{{ b.share_pct | pct(False, 0) }}</td>
@@ -77,6 +81,10 @@
     </table></div>
     <p class="muted">Amounts include an estimated {{ s.buys | sum(attribute='fee_eur') | eur }} in fees. Use limit orders; prices are from this run.</p>
     {% else %}<p>Nothing to buy in this scenario — the money stays in cash.</p>{% endif %}
+    {% if s.leftover_plan %}
+      <h3 style="margin:18px 0 6px;font-size:14px">Money the Top 10 couldn't take ({{ s.top10_leftover_eur | eur }})</h3>
+      <ul class="list">{% for d in s.leftover_plan %}<li><strong>{{ d.use }} — {{ d.eur | eur }}</strong>{% if d.tickers %} ({{ d.tickers | join(', ') }}){% endif %}: {{ d.why }}</li>{% endfor %}</ul>
+    {% endif %}
     {% if s.top10_status %}
       <h3 style="margin:18px 0 6px;font-size:14px">The Top 10 from Opportunities, and what this plan does with each</h3>
       <div class="table-wrap"><table>

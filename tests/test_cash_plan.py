@@ -138,7 +138,45 @@ class PlanTests(unittest.TestCase):
         text = " ".join(plan["scenarios"][0]["reasoning"])
         self.assertIn("#2 W1", text)
         self.assertIn("#3 W2", text)
-        self.assertIn("Only 1 idea(s) qualified", text)
+        self.assertIn("couldn't go into the Top 10: 1 idea(s) qualified", text)
+        self.assertIn("Keep ready", text)
+
+    def leftover(self, opps, macro=CALM, spy=SPY_UP, **bench):
+        b = {"SPY": spy, **bench}
+        return cash_plan.build_cash_plan(opps, [sale("NVDA", 6000, 1500)], macro, b, FX, {"total_value_eur": 20000.0},
+                                         today=date(2026, 10, 5))["scenarios"][0]
+
+    def test_leftover_ready_for_watched_names(self):
+        s = self.leftover([held("NVDA", 8000, score=90), idea("W1", action="WATCH", score=85), idea("OK", score=70)])
+        uses = {d["use"]: d for d in s["leftover_plan"]}
+        self.assertEqual(uses["Keep ready"]["tickers"], ["W1"])
+        self.assertGreater(s["ready_eur"], 0)
+        self.assertAlmostEqual(s["keep_eur"] + s["invest_eur"] + s["unallocated_eur"], s["available_eur"], places=2)
+
+    def test_leftover_held_in_nervous_market(self):
+        s = self.leftover([held("NVDA", 8000, score=90), idea("OK", score=70)], STRESSED, SPY_DOWN,
+                          **{"ISWD.L": [50.0] * 300})
+        self.assertEqual([d["use"] for d in s["leftover_plan"]], ["Hold as cash"])
+        self.assertFalse(any(b.get("parking") for b in s["buys"]))
+
+    def test_leftover_next_in_line_then_etf_in_calm_market(self):
+        opps = [held("NVDA", 8000, score=95)] + [idea(f"T{i}", score=90 - i, action="WATCH", adj_upside=5.0) for i in range(8)]
+        opps += [idea("TOP", score=60), idea("NEXT", score=40), idea("NEXT2", score=39)]
+        s = self.leftover(opps, **{"ISWD.L": [50.0] * 300})
+        uses = [d["use"] for d in s["leftover_plan"]]
+        self.assertIn("Next-in-line stocks", uses)
+        self.assertIn("Broad Shariah ETF", uses)
+        etf = next(b for b in s["buys"] if b.get("parking"))
+        self.assertEqual(etf["ticker"], "ISWD.L")
+        self.assertLessEqual(etf["weight_after_pct"], config.PARKING_MAX_PCT)
+        self.assertTrue(all("share_pct" in b and "tranches" in b for b in s["buys"]))
+        self.assertAlmostEqual(sum(b["share_pct"] for b in s["buys"]), 100, delta=0.5)
+        self.assertAlmostEqual(s["keep_eur"] + s["invest_eur"] + s["unallocated_eur"], s["available_eur"], places=2)
+
+    def test_leftover_policy_cash(self):
+        with mock.patch.object(config, "LEFTOVER_POLICY", "cash"):
+            s = self.leftover([held("NVDA", 8000, score=90), idea("OK", score=70)], **{"ISWD.L": [50.0] * 300})
+        self.assertEqual([d["use"] for d in s["leftover_plan"]], ["Hold as cash"])
 
     def test_earnings_soon_waits(self):
         opps = [held("NVDA", 8000), idea("LLY", next_event="Earnings 2026-10-08", days_to_event=3)]

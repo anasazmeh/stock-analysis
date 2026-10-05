@@ -317,6 +317,10 @@ def _section_cash(lines, plan):
             lines.append(f"| {b['ticker']} | {b['units']:g} | {_eur(b['eur'])} | {b['share_pct']:.0f}% | {b['shariah']} | {when} | "
                          f"{'; '.join(b['reasons'][:2]).replace('|', '/')} |")
         lines.append("")
+    if s.get("leftover_plan"):
+        lines += [f"**Money the Top 10 couldn't take ({_eur(s['top10_leftover_eur'])}):**", ""]
+        lines += [f"- {d['use']} — {_eur(d['eur'])}" + (f" ({', '.join(d['tickers'])})" if d["tickers"] else "") + f": {d['why']}"
+                  for d in s["leftover_plan"]] + [""]
     lines += [f"- {r.replace('**', '')}" for r in s["reasoning"]] + ["", "---", ""]
 
 

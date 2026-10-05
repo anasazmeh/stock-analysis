@@ -277,6 +277,15 @@ REINVEST_MIN_TICKET  = 250.0    # EUR — smaller buys cost too much in fees
 REINVEST_MIN_UPSIDE  = 15.0     # % quality-adjusted upside an idea needs without a Claude BUY
 REINVEST_SHARIAH_ONLY = False   # True = only Shariah "Yes" ideas get new money (label stays visible either way)
 SECTOR_SOFT_CAP_PCT  = 35.0     # buys in sectors already above this share carry a concentration note
+# Money no Top 10 idea can take: "auto" decides from the market and the candidates (keep ready for
+# names close to a buy / hold in nervous markets / next-in-line stocks or the ETF in calm ones),
+# "cash" always holds it, "etf" skips the next-in-line stocks.
+LEFTOVER_POLICY      = "auto"
+SECOND_LINE_RANKS    = 20       # "next in line" = ranks 11 to this
+PARKING_ETF          = "ISWD.L" # iShares MSCI World Islamic UCITS ETF (London, USD) — also a benchmark
+PARKING_ETF_NAME     = "iShares MSCI World Islamic UCITS ETF"
+PARKING_ETF_CURRENCY = "USD"
+PARKING_MAX_PCT      = 25.0     # at most this share of the portfolio parked in the ETF
 ALLOW_FRACTIONAL     = False    # DEGIRO buys whole shares; set True if you buy at Revolut
 BROKER_FEE_EUR       = 3.0      # per order (DEGIRO core selection is cheaper, other exchanges ~€3-4)
 FX_FEE_PCT           = 0.25     # DEGIRO AutoFX / Revolut weekend markup, on non-EUR trades

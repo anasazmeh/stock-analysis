@@ -69,14 +69,14 @@ def create_app(report_dir: str = None, runs_dir: str = None, run_cmd: list = Non
 
     @app.template_filter("eur")
     def eur(v, signed=False):
-        if v is None:
+        if v is None or not isinstance(v, (int, float)):
             return "–"
         s = f"€{abs(v):,.0f}"
         return (("+" if v >= 0 else "−") + s) if signed else s
 
     @app.template_filter("pct")
     def pct(v, signed=True, digits=1):
-        if v is None:
+        if v is None or not isinstance(v, (int, float)):
             return "–"
         return f"{v:+.{digits}f}%" if signed else f"{v:.{digits}f}%"
 

@@ -148,7 +148,8 @@ def _sector_weights(opportunities: list[Opportunity]) -> dict:
     return out
 
 
-def eligible_ideas(opportunities: list[Opportunity], sold: set, sectors: dict) -> tuple[list, list]:
+def eligible_ideas(opportunities: list[Opportunity], sold: set, sectors: dict, first: int = 1,
+                   last: int = 10) -> tuple[list, list]:
     """
     Walk the Opportunities tab's Top 10 in rank order. Return (ideas, top10_status):
     ideas are the Top 10 names that pass the buy checks, still in rank order and
@@ -158,7 +159,9 @@ def eligible_ideas(opportunities: list[Opportunity], sold: set, sectors: dict) -
     from src.events import earnings_blackout
     from src.ranking import top_ranked
     ideas, status = [], []
-    for rank, o in enumerate(top_ranked(opportunities, 10), 1):
+    for rank, o in enumerate(top_ranked(opportunities, last), 1):
+        if rank < first:
+            continue
         a = o.analysis if o.analysis and o.analysis.status == "OK" else None
         up = o.adj_upside
         why_not = []
@@ -182,13 +185,13 @@ def eligible_ideas(opportunities: list[Opportunity], sold: set, sectors: dict) -
             why_not.append(f"Sell review says {o.sell_review['category'].lower()}")
         if config.REINVEST_SHARIAH_ONLY and (not o.shariah or o.shariah.compliant != "Yes"):
             why_not.append("Shariah-only setting is on")
-        entry = {"rank": rank, "ticker": o.ticker, "name": o.name, "rank_score": o.rank_score,
+        entry = {"rank": rank, "ticker": o.ticker, "name": o.name, "rank_score": o.rank_score, "upside": up,
                  "shariah": o.shariah.compliant if o.shariah else "Unknown", "held": bool(o.portfolio)}
         if why_not:
             status.append({**entry, "outcome": "skip", "why": why_not})
             continue
         sector_w = sectors.get(o.sector or "Unknown", 0)
-        reasons = [f"#{rank} on Opportunities (score {o.rank_score:.1f})"]
+        reasons = [f"#{rank} on Opportunities (score {o.rank_score:.1f})" + (" — next in line after the Top 10" if rank > 10 else "")]
         if a:
             reasons.append(f"Claude: {'add' if o.portfolio and a.holder_action == 'ADD' else 'buy'} ({a.confidence} confidence)")
         if up is not None:
@@ -280,8 +283,102 @@ def _tranches(buy: dict, market: dict) -> list:
     return [{"when": "now", "pct": 100}]
 
 
-# ── 4. The plan ───────────────────────────────────────────────────────────
-def _scenario(name, rows, ideas, market, exposure, fx, existing_cash):
+# ── 4. What to do with money no Top 10 idea can take ─────────────────────
+_TIMING = ("Claude: watch", "in a downtrend")
+
+
+def _etf_buy(amount: float, benchmarks: dict, fx, portfolio_after: float) -> dict | None:
+    series = benchmarks.get(config.PARKING_ETF) or []
+    if not series or fx is None:
+        return None
+    price = series[-1]
+    price_eur = fx.convert(price, config.PARKING_ETF_CURRENCY, "EUR")
+    if not price_eur:
+        return None
+    amount = min(amount, config.PARKING_MAX_PCT / 100 * portfolio_after)
+    fee = _fees(amount, config.PARKING_ETF_CURRENCY)
+    units = (amount - fee) / price_eur
+    units = round(units, 4) if config.ALLOW_FRACTIONAL else math.floor(units)
+    if units <= 0 or units * price_eur < config.REINVEST_MIN_TICKET:
+        return None
+    return {"ticker": config.PARKING_ETF, "name": config.PARKING_ETF_NAME, "units": units, "price": round(price, 4),
+            "currency": config.PARKING_ETF_CURRENCY, "price_eur": round(price_eur, 4), "fee_eur": round(fee, 2),
+            "eur": round(units * price_eur + fee, 2), "shariah": "Yes", "held": False,
+            "blackout": False, "next_event": "", "days_to_event": None, "parking": True, "rank": None,
+            "sector": "Broad market fund", "rank_score": None,
+            "weight_after_pct": round(units * price_eur / portfolio_after * 100, 1) if portfolio_after else None,
+            "reasons": ["Shariah index fund (MSCI World Islamic, ~400 companies): stays invested while no stock qualifies",
+                        "sell it to pay for the next idea that passes the checks"]}
+
+
+def _leftover_plan(leftover: float, s: dict, market: dict, status: list, second: list, benchmarks: dict, fx) -> tuple:
+    """
+    Decide between three uses for money the Top 10 couldn't take, in this order:
+      1. Ready cash for Top 10 names that failed only on timing (Claude 'watch', downtrend) but have upside —
+         they can turn into buys within weeks.
+      2. Nervous market (Elevated/Stressed) → the rest stays cash: prices may get cheaper.
+      3. Calm/Normal → next-in-line stocks (ranks 11-20 that pass every check), then a broad Shariah ETF.
+    Returns (decisions, extra buys, cash still unplaced).
+    """
+    decisions, extra = [], []
+    policy = config.LEFTOVER_POLICY
+    if leftover < config.REINVEST_MIN_TICKET:
+        return decisions, extra, leftover
+    slot = s["deployable_eur"] / config.REINVEST_MAX_IDEAS if s["deployable_eur"] else 0
+    watch = [t for t in status if t["outcome"] == "skip" and t["why"]
+             and all(w.startswith(_TIMING) for w in t["why"]) and (t.get("upside") or 0) >= config.REINVEST_MIN_UPSIDE]
+    if watch and policy == "auto":
+        ready = min(leftover, len(watch) * slot)
+        if ready >= config.REINVEST_MIN_TICKET:
+            names = ", ".join(f"#{t['rank']} {t['ticker']} ({t['upside']:+.0f}%)" for t in watch)
+            decisions.append({"use": "Keep ready", "eur": ready, "tickers": [t["ticker"] for t in watch],
+                              "why": f"{names} have upside but aren't buys yet ({'; '.join(sorted({w.split(' — ')[0] for t in watch for w in t['why']}))}). "
+                                     "Cash kept ready so you can act when Claude upgrades them or the trend turns."})
+            leftover -= ready
+    if leftover < config.REINVEST_MIN_TICKET:
+        return decisions, extra, leftover
+    if policy == "cash" or market["level"] in ("Elevated", "Stressed"):
+        why = (f"Market risk is {market['level'].lower()}: prices can fall further, and cash lets you buy them cheaper. "
+               "The next runs will put it to work when conditions calm down." if policy != "cash" else
+               "LEFTOVER_POLICY is 'cash'.")
+        decisions.append({"use": "Hold as cash", "eur": leftover, "tickers": [], "why": why})
+        return decisions, extra, leftover
+    slots = config.REINVEST_MAX_IDEAS - len(s["buys"])
+    if policy == "auto" and second and slots > 0:
+        picks, rest = _allocate(leftover, second[:slots], {}, s["portfolio_after_eur"], fx)
+        if picks:
+            for b in picks:
+                b["second_line"] = True
+                b["tranches"] = _tranches(b, market)
+            extra += picks
+            spent = leftover - rest
+            decisions.append({"use": "Next-in-line stocks", "eur": spent, "tickers": [b["ticker"] for b in picks],
+                              "why": "Ranked just below the Top 10 and pass every buy check — better than idle cash "
+                                     "in a calm market."})
+            leftover = rest
+    etf_note = "Too small for another buy after fees."
+    if leftover >= config.REINVEST_MIN_TICKET:
+        etf = _etf_buy(leftover, benchmarks, fx, s["portfolio_after_eur"])
+        if not benchmarks.get(config.PARKING_ETF):
+            etf_note = f"No price for {config.PARKING_ETF} this run (see Data Health), so it waits in cash."
+        elif etf and leftover - etf["eur"] >= config.REINVEST_MIN_TICKET:
+            etf_note = f"Above the {config.PARKING_MAX_PCT:g}% limit for the ETF (PARKING_MAX_PCT)."
+        if etf:
+            etf["tranches"] = _tranches(etf, market)
+            extra.append(etf)
+            decisions.append({"use": "Broad Shariah ETF", "eur": etf["eur"], "tickers": [etf["ticker"]],
+                              "why": f"Market risk is {market['level'].lower()} and no other stock qualifies: "
+                                     f"{config.PARKING_ETF_NAME} keeps the money invested and spread out until a "
+                                     "better idea appears."})
+            leftover -= etf["eur"]
+    if leftover >= 1:
+        decisions.append({"use": "Hold as cash", "eur": leftover, "tickers": [],
+                          "why": etf_note})
+    return decisions, extra, leftover
+
+
+# ── 5. The plan ───────────────────────────────────────────────────────────
+def _scenario(name, rows, ideas, market, exposure, fx, existing_cash, status=None, second=None, benchmarks=None):
     rate, rate_src = tax_rate()
     proceeds = sum(r.get("proceeds_eur") or 0 for r in rows)
     sell_fees = sum(_fees(r.get("proceeds_eur") or 0, r.get("currency")) for r in rows)
@@ -301,8 +398,20 @@ def _scenario(name, rows, ideas, market, exposure, fx, existing_cash):
     buys, leftover = _allocate(deployable, ideas, exposure, portfolio_after, fx)
     for b in buys:
         b["tranches"] = _tranches(b, market)
+    partial = {"buys": buys, "deployable_eur": deployable, "portfolio_after_eur": portfolio_after}
+    decisions, extra, leftover_end = _leftover_plan(leftover, partial, market, status or [], second or [],
+                                                    benchmarks or {}, fx)
+    top10_left = leftover
+    buys = buys + extra
+    total_buys = sum(b["eur"] for b in buys) or 1
+    for b in buys:                         # share of everything invested, Top 10 and leftover buys together
+        b["share_pct"] = round(b["eur"] / total_buys * 100, 1)
+    ready = sum(d["eur"] for d in decisions if d["use"] == "Keep ready")
+    leftover = leftover_end + ready          # "keep ready" money is cash too
     cash_end = keep + leftover
     return {
+        "leftover_plan": decisions, "top10_leftover_eur": top10_left,
+        "ready_eur": ready,
         "name": name, "sales": [{"ticker": r["ticker"], "action": r["action"], "proceeds_eur": r.get("proceeds_eur"),
                                  "realised_pl_eur": r.get("realised_pl_eur"), "category": r["category"]} for r in rows],
         "proceeds_eur": proceeds, "sell_fees_eur": sell_fees, "net_proceeds_eur": net,
@@ -345,15 +454,13 @@ def _reasoning(s: dict, market: dict, ideas: list) -> list:
             reason = t["why"][0].split(" — ")[0] if t["why"] else "other"
             counts[reason] = counts.get(reason, []) + [f"#{t['rank']} {t['ticker']}"]
         out.append("Top 10 names skipped: " + "; ".join(f"{', '.join(v)} ({k})" for k, v in counts.items()) + ".")
-    if s["buys"] and len(s["buys"]) < config.REINVEST_MAX_IDEAS and s["unallocated_eur"] >= config.REINVEST_MIN_TICKET:
-        out.append(f"Only {len(s['buys'])} idea(s) qualified, and one idea may take at most "
-                   f"{config.REINVEST_MAX_SHARE * 100:.0f}% of the money to invest (REINVEST_MAX_SHARE) and stay under the "
-                   f"{config.POSITION_CAP_PCT:g}% position cap — so €{s['unallocated_eur']:,.0f} waits in cash for the next "
-                   "qualifying idea instead of concentrating it in one stock.")
-    elif s["unallocated_eur"] >= config.REINVEST_MIN_TICKET and s["buys"]:
-        out.append(f"€{s['unallocated_eur']:,.0f} stays cash: the ideas that qualify are already at the "
-                   f"{config.POSITION_CAP_PCT:g}% position cap or the {config.REINVEST_MAX_SHARE * 100:.0f}% per-idea limit. "
-                   "Spreading it over weaker ideas would lower the quality of the portfolio.")
+    if s.get("leftover_plan"):
+        top_buys = [b for b in s["buys"] if not b.get("parking") and not b.get("second_line")]
+        out.append(f"€{s['top10_leftover_eur']:,.0f} couldn't go into the Top 10: {len(top_buys)} idea(s) qualified, and one idea "
+                   f"takes at most {config.REINVEST_MAX_SHARE * 100:.0f}% of the money and must stay under the "
+                   f"{config.POSITION_CAP_PCT:g}% position cap. What happens to it depends on the market and the "
+                   "candidates: " + "; ".join(f"**{d['use']} €{d['eur']:,.0f}**" for d in s["leftover_plan"])
+                   + " — reasons under \"Money the Top 10 couldn't take\".")
     if market["level"] in ("Elevated", "Stressed"):
         out.append("Buys are split into three tranches over four weeks: in nervous markets prices can fall further after you buy, "
                    "and spreading entries lowers the cost of being early.")
@@ -403,7 +510,8 @@ def build_cash_plan(opportunities: list[Opportunity], sell_rows: list, macro: Ma
     for name, rows in (("Strong sell signals only", strong), ("Strong + Consider", strong + consider)):
         sold = {r["ticker"] for r in rows}
         ideas, status = eligible_ideas(opportunities, sold, sectors)
-        sc = _scenario(name, rows, ideas, market, exposure, fx, existing)
+        second, _ = eligible_ideas(opportunities, sold, sectors, first=11, last=config.SECOND_LINE_RANKS)
+        sc = _scenario(name, rows, ideas, market, exposure, fx, existing, status, second, benchmarks or {})
         bought = {b["ticker"]: b for b in sc["buys"]}
         for st in status:
             if st["outcome"] != "candidate":
@@ -412,7 +520,7 @@ def build_cash_plan(opportunities: list[Opportunity], sell_rows: list, macro: Ma
                 st.update(outcome="buy", eur=bought[st["ticker"]]["eur"], units=bought[st["ticker"]]["units"])
             elif sc["deployable_eur"] < config.REINVEST_MIN_TICKET:
                 st.update(outcome="wait", why=["no money left to invest after the cash reserve"])
-            elif st["rank"] > max([b["rank"] for b in sc["buys"]] + [0]) and len(sc["buys"]) >= config.REINVEST_MAX_IDEAS:
+            elif st["rank"] > max([b.get("rank") or 0 for b in sc["buys"]] + [0]) and len(sc["buys"]) >= config.REINVEST_MAX_IDEAS:
                 st.update(outcome="wait", why=[f"the plan spreads money over at most {config.REINVEST_MAX_IDEAS} ideas"])
             else:
                 st.update(outcome="wait", why=["already at the position cap, or the amount is below the minimum ticket"])
