@@ -77,9 +77,19 @@
     </table></div>
     <p class="muted">Amounts include an estimated {{ s.buys | sum(attribute='fee_eur') | eur }} in fees. Use limit orders; prices are from this run.</p>
     {% else %}<p>Nothing to buy in this scenario — the money stays in cash.</p>{% endif %}
-    {% if s.near_misses %}
-      <h3 style="margin:16px 0 6px;font-size:14px">Close, but not yet</h3>
-      <ul class="list">{% for m in s.near_misses %}<li><a href="{{ url_for('stock', ticker=m.ticker) }}">{{ m.ticker }}</a> — {{ m.why_not | join(', ') }}</li>{% endfor %}</ul>
+    {% if s.top10_status %}
+      <h3 style="margin:18px 0 6px;font-size:14px">The Top 10 from Opportunities, and what this plan does with each</h3>
+      <div class="table-wrap"><table>
+        <thead><tr><th class="num">#</th><th>Ticker</th><th class="num">Score</th><th>Shariah</th><th>Plan</th><th class="wrap">Why</th></tr></thead>
+        <tbody>{% for t in s.top10_status %}
+          <tr><td class="num">{{ t.rank }}</td>
+            <td><a href="{{ url_for('stock', ticker=t.ticker) }}"><strong>{{ t.ticker }}</strong></a>{% if t.held %} <span class="chip info">held</span>{% endif %}</td>
+            <td class="num">{{ t.rank_score | num(1) }}</td>
+            <td>{{ shariah({'compliant': t.shariah}) }}</td>
+            <td>{% if t.outcome == 'buy' %}<span class="chip good">buy {{ t.eur | eur }}</span>{% elif t.outcome == 'wait' %}<span class="chip warn">not this time</span>{% else %}<span class="chip muted">skip</span>{% endif %}</td>
+            <td class="wrap muted">{{ t.why | join('; ') or '–' }}</td></tr>
+        {% endfor %}</tbody>
+      </table></div>
     {% endif %}
   </section>
 </div>

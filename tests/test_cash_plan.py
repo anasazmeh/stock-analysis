@@ -99,7 +99,10 @@ class PlanTests(unittest.TestCase):
         self.assertEqual(s["buys"], [])
         self.assertAlmostEqual(s["cash_end_eur"], s["available_eur"], places=2)
         self.assertTrue(any("stays in cash" in r for r in plan["reasoning"]))
-        self.assertEqual({m["ticker"] for m in s["near_misses"]}, {"BAD", "DOWN", "NOTRADE"})
+        why = {t["ticker"]: t for t in s["top10_status"]}
+        self.assertEqual(why["BAD"]["outcome"], "skip")
+        self.assertIn("in a downtrend", why["DOWN"]["why"])
+        self.assertIn("not tradable at DEGIRO/Revolut", why["NOTRADE"]["why"])
 
     def test_tax_reserve_from_realised_gains(self):
         with mock.patch.object(config, "CAPITAL_GAINS_TAX_RATE", 0.25):
@@ -113,12 +116,20 @@ class PlanTests(unittest.TestCase):
         self.assertLessEqual(b["eur"], config.REINVEST_MAX_SHARE * s["deployable_eur"] + 1)
         self.assertGreater(s["unallocated_eur"], 0)
 
-    def test_sector_concentration_gets_less(self):
-        opps = [held("NVDA", 8000, "Technology"), idea("TECH", "Technology"), idea("HEAL", "Healthcare"),
-                idea("FIN", "Financials")]
-        s = self.plan(opps, [sale("NVDA", 4000, 1500)])["scenarios"][0]
-        w = {b["ticker"]: b["eur"] for b in s["buys"]}
-        self.assertGreater(w["HEAL"], w["TECH"])
+    def test_follows_top10_order_and_rank_weights(self):
+        opps = [held("NVDA", 8000, score=90)] + [idea(f"T{i}", score=80 - i) for i in range(12)]
+        s = self.plan(opps, [sale("NVDA", 4000, 1500)], total=20000)["scenarios"][0]
+        status = s["top10_status"]
+        self.assertEqual([t["rank"] for t in status], list(range(1, 11)))      # exactly the Opportunities Top 10
+        self.assertEqual(status[0]["ticker"], "NVDA")
+        self.assertIn("you're selling it in this plan", status[0]["why"])
+        bought = [b["ticker"] for b in s["buys"]]
+        self.assertEqual(bought, ["T0", "T1", "T2", "T3", "T4"])               # first five eligible, in rank order
+        self.assertNotIn("T10", bought)                                         # outside the Top 10: never bought
+        eur = [b["eur"] for b in s["buys"]]
+        self.assertEqual(eur, sorted(eur, reverse=True))                       # higher score, more money
+        waits = [t for t in status if t["outcome"] == "wait"]
+        self.assertTrue(all("at most" in t["why"][0] for t in waits))
 
     def test_earnings_soon_waits(self):
         opps = [held("NVDA", 8000), idea("LLY", next_event="Earnings 2026-10-08", days_to_event=3)]

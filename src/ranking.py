@@ -115,3 +115,9 @@ def rank_score(opp: Opportunity) -> float:
     avg = sum(w[k] * v for k, v in avail.items()) / covered
     coverage = covered / total_w
     return round(avg * (0.5 + 0.5 * coverage) * 100, 2)
+
+
+def top_ranked(opportunities: list[Opportunity], n: int = 10) -> list[Opportunity]:
+    """The Top 10 shown on the Opportunities tab and in the report: priced, passed the data gate, by rank score."""
+    ranked = sorted([o for o in opportunities if o.price > 0 and o.data_ok], key=lambda o: o.rank_score, reverse=True)
+    return ranked[:n]

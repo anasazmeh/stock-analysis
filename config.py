@@ -267,12 +267,12 @@ TRAIL_STOP_MAX_PCT   = 30.0    # ... and at most this far
 
 # ── Cash plan tab (what to do with cash from sales) ───
 CASH_TARGET_PCT      = {"Calm": 5.0, "Normal": 10.0, "Elevated": 15.0, "Stressed": 15.0}  # % of portfolio kept as cash
-REINVEST_MAX_IDEAS   = 5        # spread new money over at most this many ideas
+REINVEST_MAX_IDEAS   = 5        # new money goes to at most this many of the Top 10, in rank order
 REINVEST_MAX_SHARE   = 0.40     # no single idea gets more than this share of the money invested
 REINVEST_MIN_TICKET  = 250.0    # EUR — smaller buys cost too much in fees
 REINVEST_MIN_UPSIDE  = 15.0     # % quality-adjusted upside an idea needs without a Claude BUY
 REINVEST_SHARIAH_ONLY = False   # True = only Shariah "Yes" ideas get new money (label stays visible either way)
-SECTOR_SOFT_CAP_PCT  = 35.0     # ideas in sectors already above this share get half weight
+SECTOR_SOFT_CAP_PCT  = 35.0     # buys in sectors already above this share carry a concentration note
 ALLOW_FRACTIONAL     = False    # DEGIRO buys whole shares; set True if you buy at Revolut
 BROKER_FEE_EUR       = 3.0      # per order (DEGIRO core selection is cheaper, other exchanges ~€3-4)
 FX_FEE_PCT           = 0.25     # DEGIRO AutoFX / Revolut weekend markup, on non-EUR trades

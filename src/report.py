@@ -410,8 +410,8 @@ def generate_report(opportunities: list[Opportunity], macro: MacroContext, *, he
                     av_stats: dict = None, sell_rows: list = None, cash_plan: dict = None) -> tuple[str, list[Opportunity]]:
     """Render the report. Returns (markdown, top10)."""
     run_date = datetime.now().strftime("%B %d, %Y — %H:%M")
-    ranked = sorted([o for o in opportunities if o.price > 0 and o.data_ok],
-                    key=lambda o: o.rank_score, reverse=True)
+    from src.ranking import top_ranked
+    ranked = top_ranked(opportunities, n=len(opportunities))
     top10 = ranked[:10]
     internal = {"API keys", "AI backend", "SEC contact", "Data-quality gate", "Shariah screen", "Broker CSV reconciliation", "Symbol lookup"}
     ok_sources = [k for k, (s, _) in (health.sources.items() if health else [])
