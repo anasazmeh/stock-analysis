@@ -106,3 +106,27 @@ class DedupeTests(unittest.TestCase):
     def test_different_companies_untouched(self):
         opps = [self.opp("SIE.DE", "Siemens AG", "Germany"), self.opp("ENR.DE", "Siemens Energy AG", "Germany")]
         self.assertEqual(len(symbols.dedupe_listings(opps)[0]), 2)
+
+
+class ListingRuleTests(unittest.TestCase):
+    def test_share_class_marker_ignored(self):
+        self.assertEqual(symbols.company_key("Apple Inc. R"), symbols.company_key("Apple Inc."))
+        self.assertEqual(symbols.company_key("NVIDIA CORP. R"), symbols.company_key("NVIDIA Corporation"))
+        self.assertEqual(symbols.company_key("ASML HOLDING"), symbols.company_key("ASML Holding N.V."))
+        self.assertEqual(symbols.company_key("X"), "x")
+
+    def test_german_lines_collapse_onto_held_listing_and_tradable_wins(self):
+        from src.models import Opportunity, PortfolioHolding
+        mk = lambda t, n, vol=1e5, **kw: Opportunity(ticker=t, name=n, country="United States", price=10.0, avg_volume=vol, **kw)
+        kept, dropped = symbols.dedupe_listings([mk("APC.F", "Apple Inc. R", 9e9), mk("APC.DE", "Apple Inc. R"),
+                                                 mk("APC8.F", "Apple Inc. R"), mk("NVD.F", "NVIDIA CORP. R"),
+                                                 mk("NVDA", "NVIDIA Corporation", portfolio=PortfolioHolding())])
+        self.assertEqual(sorted(o.ticker for o in kept), ["APC.DE", "NVDA"])   # .F is not a broker market → .DE wins
+        self.assertEqual(dropped["NVD.F"], "NVDA")
+
+    def test_top10_skips_watch_only(self):
+        from src.models import Opportunity
+        from src.ranking import top_ranked
+        opps = [Opportunity(ticker="005930.KS", price=1, data_ok=True, tradable="Watch only", rank_score=70),
+                Opportunity(ticker="SE", price=1, data_ok=True, tradable="Yes", rank_score=60)]
+        self.assertEqual([o.ticker for o in top_ranked(opps)], ["SE"])

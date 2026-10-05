@@ -118,6 +118,11 @@ def rank_score(opp: Opportunity) -> float:
 
 
 def top_ranked(opportunities: list[Opportunity], n: int = 10) -> list[Opportunity]:
-    """The Top 10 shown on the Opportunities tab and in the report: priced, passed the data gate, by rank score."""
-    ranked = sorted([o for o in opportunities if o.price > 0 and o.data_ok], key=lambda o: o.rank_score, reverse=True)
+    """
+    The Top 10 shown on the Opportunities tab, in the report and used by the Cash plan: priced, passed
+    the data gate, buyable at your brokers (not "Watch only"), by rank score. Watch-only names stay in
+    the full list with their score.
+    """
+    ranked = sorted([o for o in opportunities if o.price > 0 and o.data_ok and o.tradable != "Watch only"],
+                    key=lambda o: o.rank_score, reverse=True)
     return ranked[:n]

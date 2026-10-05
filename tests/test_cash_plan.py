@@ -102,7 +102,7 @@ class PlanTests(unittest.TestCase):
         why = {t["ticker"]: t for t in s["top10_status"]}
         self.assertEqual(why["BAD"]["outcome"], "skip")
         self.assertIn("in a downtrend", why["DOWN"]["why"])
-        self.assertIn("not tradable at DEGIRO/Revolut", why["NOTRADE"]["why"])
+        self.assertNotIn("NOTRADE", why)        # watch-only names don't take a Top 10 place
 
     def test_tax_reserve_from_realised_gains(self):
         with mock.patch.object(config, "CAPITAL_GAINS_TAX_RATE", 0.25):
