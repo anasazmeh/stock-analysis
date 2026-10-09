@@ -215,6 +215,8 @@ def main() -> int:
     for o in opportunities:
         o.rank_score = rank_score(o)
     macro = attach_events(opportunities, macro)
+    from src.events import calendar_status
+    HEALTH.record("Macro calendar", *calendar_status())
     print()
 
     # ── 7. Claude: macro first, then per-ticker evidence packs ───────────

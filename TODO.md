@@ -111,11 +111,12 @@ it appeared in and a suggested fix. Items not seen for 5 runs move to *Resolved*
 - [ ] Commit TECH_DEBT.md now and then so the backlog is visible on GitHub
 
 ### Known design debt
-- [ ] **No CI** — tests only run by hand; add a GitHub Actions workflow running `python3 -m unittest discover tests`
+- [x] **CI** — `.github/workflows/tests.yml` runs every test on each push and pull request (Python 3.11 and 3.12)
 - [ ] **Live-data parsers are tested against documented formats only** (the build sandbox can't reach Yahoo, SEC,
       GDELT…) — save a few real responses as test fixtures after the first runs
 - [ ] **Abu Dhabi suffix unconfirmed** (`.AD` vs `.AE` on Yahoo) — check the "Symbol lookup" line in Data Health, then fix `config.py`
-- [ ] **`MACRO_EVENTS` in `config.py` ends on 2026-12-17** — add the 2027 Fed / ECB / CPI dates before then
+- [x] **`MACRO_EVENTS`** covers all 2027 Fed and ECB decisions; Data Health warns 90 days before it runs out
+- [ ] **2027 US CPI dates** — BLS publishes them in late 2026; add them to `MACRO_EVENTS` then (Data Health will remind you)
 - [ ] **Most modules report with `print()`** — issue capture relies on wording ("failed", "✗", "warning");
       move to `logging` with levels when touching a module
 - [ ] **yfinance is an unofficial Yahoo API** — it breaks every few months; the Finnhub price cross-check is the
