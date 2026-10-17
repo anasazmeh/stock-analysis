@@ -54,7 +54,7 @@ MAX_DISCOVERED = 30
 # ── Index universe (free: Wikipedia constituent tables) ──
 UNIVERSE_INDICES = {
     "S&P 500":    "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies",
-    "Nasdaq-100": "https://en.wikipedia.org/wiki/Nasdaq-100",
+    "Nasdaq-100": "https://api.nasdaq.com/api/quote/list-type/nasdaq100",   # Wikipedia dropped this table
 }
 # Holdings CSVs downloaded from Shariah ETF issuers (e.g. SPUS, HLAL, ISWD) — file name = ETF label.
 SHARIAH_ETF_DIR   = "data/universe"
@@ -78,7 +78,7 @@ GDELT_MACRO_QUERIES = [
     '"European Central Bank" rates',
     'Taiwan semiconductor "export controls"',
     '"Saudi Arabia" stock market',
-    '"UAE" economy stocks',
+    '("UAE economy" OR "UAE stocks" OR "Abu Dhabi stocks" OR "Dubai stocks")',
 ]
 
 # ── SEC EDGAR filings watch (free, US-listed tickers incl. ADRs) ──

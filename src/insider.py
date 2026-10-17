@@ -2,8 +2,14 @@
 SEC EDGAR Form 4 insider trading signal (US filers only, no API key).
 
 Signal over the last 30 days: Bullish (net open-market buys >= 1,000 shares),
-Bearish (net sells >= 5,000), Neutral, or N/A for foreign private issuers
-(TSM, ASML, SAP, NIO ...), which do not file Form 4.
+Bearish (net discretionary sells >= 5,000 shares and >= 0.05% of the shares
+outstanding), Neutral, or N/A for foreign private issuers (TSM, ASML, SAP, NIO ...),
+which do not file Form 4.
+
+Sales under a pre-set Rule 10b5-1 trading plan (the filing's 10b5-1 box) are
+scheduled months ahead, so they are reported separately and don't count as a
+bearish signal. Executives of large companies sell stock every month as pay; the
+size test stops 7,000 shares of Microsoft from looking like a warning.
 """
 import sys
 import os
@@ -22,6 +28,7 @@ from src.sec import (HEADERS, ARCHIVE_URL, load_ticker_cik_map, cik_for,
 
 _BULLISH_THRESHOLD = 1_000
 _BEARISH_THRESHOLD = -5_000
+_BEARISH_SHARE_OF_COMPANY = 0.0005   # 0.05% of shares outstanding in 30 days
 
 # kept for modules that imported the old name
 _load_ticker_cik_map = load_ticker_cik_map
@@ -38,25 +45,26 @@ def recent_form4(recent: dict, days: int = 30) -> list[dict]:
 
 
 def parse_form4_xml(content: bytes) -> list[dict]:
-    """Open-market purchases (P) and sales (S) from a Form 4 XML document."""
+    """Open-market purchases (P) and sales (S) from a Form 4 XML document; plan=True for 10b5-1 plan trades."""
     try:
         root = ET.fromstring(content)
     except ET.ParseError:
         return []
+    plan = root.findtext("aff10b5One", "").strip().lower() in ("1", "true")
     txns = []
     for txn in root.findall(".//nonDerivativeTransaction"):
         code = txn.findtext("transactionCoding/transactionCode", "").strip().upper()
         shares = txn.findtext("transactionAmounts/transactionShares/value", "").strip()
         if code in ("P", "S") and shares:
             try:
-                txns.append({"code": code, "shares": abs(float(shares))})
+                txns.append({"code": code, "shares": abs(float(shares)), "plan": plan})
             except ValueError:
                 continue
     return txns
 
 
 def _fetch_form4(cik: str, filing: dict) -> list[dict]:
-    cache_key = f"edgar:form4:{filing['accession']}"
+    cache_key = f"edgar:form4:v2:{filing['accession']}"
     cached = cache.get(cache_key, 30 * 86400)
     if cached is not None:
         return cached
@@ -73,13 +81,19 @@ def _fetch_form4(cik: str, filing: dict) -> list[dict]:
     return txns
 
 
-def compute_signal(transactions: list[dict]) -> tuple[str, int]:
+def planned_sales(transactions: list[dict]) -> int:
+    return int(sum(t["shares"] for t in transactions if t["code"] == "S" and t.get("plan")))
+
+
+def compute_signal(transactions: list[dict], shares_outstanding: float = 0) -> tuple[str, int]:
+    """(signal, net discretionary shares). 10b5-1 plan sales are left out of the net."""
     bought = sum(t["shares"] for t in transactions if t["code"] == "P")
-    sold = sum(t["shares"] for t in transactions if t["code"] == "S")
+    sold = sum(t["shares"] for t in transactions if t["code"] == "S" and not t.get("plan"))
     net = int(bought - sold)
     if net >= _BULLISH_THRESHOLD:
         return "Bullish", net
-    if net <= _BEARISH_THRESHOLD:
+    material = not shares_outstanding or -net >= shares_outstanding * _BEARISH_SHARE_OF_COMPANY
+    if net <= _BEARISH_THRESHOLD and material:
         return "Bearish", net
     return "Neutral", net
 
@@ -98,6 +112,7 @@ def fetch_insider_trades(opportunities: list[Opportunity]) -> list[Opportunity]:
             o.insider_signal = "Unavailable"
         return opportunities
 
+    quiet = 0
     for opp in us_opps:
         cik = cik_for(opp.ticker, cik_map)
         if not cik:
@@ -113,7 +128,14 @@ def fetch_insider_trades(opportunities: list[Opportunity]) -> list[Opportunity]:
         txns = []
         for filing in recent_form4(recent)[:15]:
             txns.extend(_fetch_form4(cik, filing))
-        opp.insider_signal, opp.insider_net_shares = compute_signal(txns)
+        shares_out = opp.mcap / opp.price if opp.mcap and opp.price else 0
+        opp.insider_signal, opp.insider_net_shares = compute_signal(txns, shares_out)
+        opp.insider_planned_shares = planned_sales(txns)
         if opp.insider_signal != "Neutral":
-            print(f"  [insider] {opp.ticker}: {opp.insider_signal} — net {opp.insider_net_shares:+,} shares (30d)")
+            share = f" ({-opp.insider_net_shares / shares_out:.2%} of the company)" if shares_out and opp.insider_net_shares < 0 else ""
+            print(f"  [insider] {opp.ticker}: {opp.insider_signal} — net {opp.insider_net_shares:+,} shares (30d){share}")
+        else:
+            quiet += 1
+    if quiet:
+        print(f"  [insider] {quiet} US companies Neutral — small routine sales and pre-planned 10b5-1 sales don't count")
     return opportunities

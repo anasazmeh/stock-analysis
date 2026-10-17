@@ -87,7 +87,7 @@
       <dt>RSI 14</dt><dd>{{ r.rsi_14 | num(0) }}</dd>
       <dt>Geography</dt><dd>{{ r.geo_exposure or '–' }}{% if r.geo_notes %}<br><span class="muted">{{ r.geo_notes | join('; ') }}</span>{% endif %}</dd>
       {% if o.short_pct_float %}<dt>Short interest</dt><dd>{{ o.short_pct_float | pct(False) }} of float</dd>{% endif %}
-      <dt>Insider (30d)</dt><dd>{{ o.insider_signal }}{% if o.insider_net_shares %} · net {{ o.insider_net_shares }} shares{% endif %}</dd>
+      <dt>Insider (30d)</dt><dd>{{ o.insider_signal }}{% if o.insider_net_shares %} · net {{ "{:+,}".format(o.insider_net_shares) }} shares{% endif %}{% if o.insider_planned_shares %} · {{ "{:,}".format(o.insider_planned_shares) }} sold under pre-set 10b5-1 plans (not counted){% endif %}</dd>
       {% if o.eps_surprise is not none %}<dt>EPS surprise</dt><dd>{{ pl(o.eps_surprise) }}</dd>{% endif %}
     </dl>
   </section>

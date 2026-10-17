@@ -60,7 +60,7 @@ Four keys unlock features already coded in the pipeline:
 `bash scripts/setup.sh` asks for them and saves them to `.env`; you can also add `KEY="value"` lines to `.env` by hand.
 
 ### 1b. Set Up the Free No-Key Sources
-These run automatically (GDELT, SEC filings, Wikipedia index lists, article text), but need:
+These run automatically (GDELT, SEC filings, S&P 500 list from Wikipedia, Nasdaq-100 list from Nasdaq, article text), but need:
 
 - **SEC contact** — SEC requires a real name and email in requests:
   `export SEC_USER_AGENT="Your Name your@email.com"`
@@ -69,7 +69,8 @@ These run automatically (GDELT, SEC filings, Wikipedia index lists, article text
   (e.g. SPUS / HLAL / ISWD) into `data/universe/`, named after the ETF (`SPUS.csv`).
   Refresh monthly. Their tickers are added to discovery and shown as a label.
 - GDELT asks for ≤1 request per 5 s, so Stage 3b takes ~4 min for 40 tickers
-  (`GDELT_MAX_TICKERS` in `config.py`; cached for 4 h).
+  (`GDELT_MAX_TICKERS` in `config.py`; cached for 4 h). A rate-limited query is retried
+  once; after 3 refusals GDELT is skipped for the rest of the run (the other news sources still apply).
 
 ### 2. Set Up Daily Automated Alerts
 ```bash
@@ -152,7 +153,7 @@ AI view, Shariah ratios, risk, filings, news) and History (portfolio vs MSCI Wor
 - [x] Risk scoring (beta, volatility, drawdown, D/E, RSI, geo exposure)
 - [x] Alpha Vantage enrichment — missing targets, earnings dates, EPS surprises
 - [x] Argaam Saudi analyst targets for `.SR` tickers
-- [x] SEC EDGAR Form 4 insider trading signals (US tickers, no key needed)
+- [x] SEC EDGAR Form 4 insider trading signals (US tickers, no key needed); pre-planned 10b5-1 sales and sales under 0.05% of the company don't count as bearish
 - [x] NewsAPI keyword sentiment scoring (fallback when Claude unavailable)
 - [x] Portfolio P&L integration — live price vs BEP, unrealised gain/loss
 - [x] Alert system — file + email + webhook, 9 trigger conditions

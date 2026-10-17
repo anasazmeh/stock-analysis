@@ -53,7 +53,13 @@ def _get_classifier():
     global _classifier, _classifier_failed
     if _classifier is None and not _classifier_failed:
         try:
+            os.environ.setdefault("HF_HUB_DISABLE_PROGRESS_BARS", "1")   # no "Loading weights" bars in the run log
             from transformers import pipeline
+            try:
+                from transformers.utils import logging as hf_logging
+                hf_logging.disable_progress_bar()
+            except Exception:
+                pass
             _classifier = pipeline("text-classification", model=config.FINBERT_MODEL, top_k=None)
         except Exception as e:
             _classifier_failed = True

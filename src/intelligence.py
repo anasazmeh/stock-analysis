@@ -141,6 +141,8 @@ def evidence_pack(opp: Opportunity) -> dict:
         add("shariah_reasons", opp.shariah.reasons, "computed")
     add("insider_signal_30d", opp.insider_signal if opp.insider_signal not in ("Neutral", "") else None,
         "SEC Form 4")
+    add("insider_10b5_1_plan_sales_30d", opp.insider_planned_shares or None,
+        "SEC Form 4 (pre-scheduled sales, not a signal)")
     add("recent_sec_filings", [f"{f['date']} {f['form']}: {', '.join(f['labels'])}" for f in opp.filings[:5]],
         "SEC EDGAR")
     add("news_sentiment_finbert", opp.finbert_score, "FinBERT over recent articles")
