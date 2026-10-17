@@ -108,7 +108,7 @@ def main() -> int:
     from src.events import attach_events
     from src.intelligence import analyze_tickers, build_macro_analysis
     from src.report import generate_report, save_report
-    from src.output_gate import scrub
+    from src.output_gate import scrub, scrub_inputs
     from src.journal import latest_snapshot, what_changed, write_snapshot, append_decisions, scorecard
     from src.alerts import dispatch_alerts
     from src.dashboard_data import build_payload, write_latest
@@ -196,6 +196,7 @@ def main() -> int:
     with_news = sum(1 for o in priced if o.news)
     HEALTH.record("News", _status(with_news, len(priced)), f"{with_news}/{len(priced)} tickers with recent news")
     HEALTH.record("FRED macro", "skipped" if not config.FRED_API_KEY else ("ok" if macro.fed_rate is not None else "failed"), "")
+    scrub_inputs(opportunities, macro)   # before Claude and FinBERT read the news
     if config.FULLTEXT_ENABLED:
         opportunities = attach_fulltext_sentiment(opportunities)
         n = sum(o.finbert_score is not None for o in opportunities)
@@ -230,6 +231,7 @@ def main() -> int:
         HEALTH.record("Claude analysis", _status(n, sum(o.data_ok for o in priced)), f"{n} tickers")
     else:
         HEALTH.record("Claude analysis", "skipped", "--no-ai, AI_BACKEND=off, or `claude` not installed")
+    scrub_inputs(opportunities, macro)   # Claude's prose can name competitors
     for o in opportunities:
         o.rank_score = rank_score(o)
     print()
@@ -264,8 +266,9 @@ def main() -> int:
 
     print(f"\n{'=' * 60}\n  ✅ Report: {path}\n{'=' * 60}\n")
     if removed or removed_alerts:
-        print(f"❌ Avoid-list gate removed {removed + removed_alerts} line(s) mentioning {sorted(config.AVOID_LIST)} — "
-              f"find where they entered the pipeline.")
+        # No tickers in this message: the dashboard's log view hides lines that name them
+        print(f"❌ Avoid-list gate removed {removed} report line(s) and {removed_alerts} alert/dashboard item(s) "
+              f"naming an avoid-list company — a pipeline leak: find where it entered.")
         return 1
     return 2 if HEALTH.degraded else 0
 

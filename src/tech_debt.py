@@ -122,8 +122,14 @@ def _save(path, data):
 def update(found: list, tickers=(), path: str = None, md_path: str = None, log_file: str = None,
            run_at: str = None) -> dict:
     """Merge one run's issues into the backlog and rewrite TECH_DEBT.md. Returns counts for the summary line."""
+    from src.runlog import redact
     path, md_path = path or JSON_PATH, md_path or MD_PATH
     data = _load(path)
+    for it in data.get("issues", {}).values():     # clean keys an older version stored
+        for field in ("title", "example"):
+            if it.get(field):
+                it[field] = redact(it[field])
+    found = [{**item, "text": redact(item["text"])} for item in found]
     run_at = run_at or datetime.now().isoformat(timespec="seconds")
     data["runs"] = (data.get("runs", []) + [run_at])[-MAX_RUNS:]
     run_no = data.get("run_count", 0) + 1
