@@ -41,6 +41,7 @@ def opportunity_row(opp: Opportunity, top10: set) -> dict:
         "trend": opp.trend, "ma50": opp.ma50, "ma200": opp.ma200, "rel_strength": opp.rel_strength,
         "next_event": opp.next_event, "days_to_event": opp.days_to_event,
         "insider_signal": opp.insider_signal, "insider_net_shares": opp.insider_net_shares,
+        "insider_planned_shares": opp.insider_planned_shares,
         "eps_surprise": opp.eps_surprise, "finbert_score": opp.finbert_score,
         "short_pct_float": opp.short_pct_float, "universe_tags": opp.universe_tags,
         "thesis_status": opp.thesis_status, "thesis_notes": opp.thesis_notes,

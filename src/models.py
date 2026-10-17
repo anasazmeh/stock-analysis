@@ -171,7 +171,8 @@ class Opportunity:
     eps_surprise: Optional[float] = None    # last quarter EPS surprise %
     # Insider trading signal (SEC EDGAR Form 4)
     insider_signal: str = "Neutral"         # Bullish / Bearish / Neutral
-    insider_net_shares: int = 0             # net shares bought (+) / sold (-)
+    insider_net_shares: int = 0             # net shares bought (+) / sold (-), 10b5-1 plan sales left out
+    insider_planned_shares: int = 0         # shares sold under pre-set 10b5-1 plans (not a signal)
     # FinBERT score over full article text (-10..+10), None if not run
     finbert_score: Optional[float] = None
     # Recent SEC filings: {form, date, items, labels, red_flag, url}

@@ -4,7 +4,9 @@ searched across machine-translated text in 65 languages, so English queries also
 find Arabic coverage of Saudi/UAE companies.
 
 GDELT asks clients to send at most one request every 5 seconds, so per-ticker
-queries are capped at config.GDELT_MAX_TICKERS (holdings first).
+queries are capped at config.GDELT_MAX_TICKERS (holdings first). A rate-limited
+query (HTTP 429) is retried once after a pause; if GDELT keeps refusing, the rest
+of the run skips it instead of logging dozens of 429s.
 """
 import sys
 import os
@@ -18,21 +20,25 @@ import requests
 import config
 import src.cache as cache
 from src.models import Opportunity, MacroContext
+from src.symbols import clean_name
 
 _API = "https://api.gdeltproject.org/api/v2/doc/doc"
-_MIN_INTERVAL = 5.5
+_MIN_INTERVAL = 6.0      # measured from the end of the previous request
+_RETRY_WAIT = 15
+_MAX_REFUSALS = 3        # rate-limited queries (after the retry) before GDELT is paused for the run
 _last_request = 0.0
+STATE = {"refused": 0, "paused": False, "skipped": 0}
 _GCC_SUFFIXES = (".SR", ".AD", ".DU", ".AE")
 _NAME_SUFFIXES = re.compile(
     r"[,.]?\s+(inc|incorporated|corp|corporation|co|company|ltd|limited|plc|n\.?v|s\.?a|se|ag|"
-    r"holdings?|group|class [a-c]|adr|ordinary shares)\.?$",
+    r"p\.?j\.?s\.?c|p\.?s\.?c|s\.?j\.?s\.?c|holdings?|group|class [a-c]|adr|ordinary shares)\.?$",
     re.IGNORECASE,
 )
 
 
 def company_query(name: str, ticker: str) -> str:
     """Build a GDELT query from a company name, e.g. 'NVIDIA Corporation' -> '"NVIDIA"'."""
-    clean = (name or "").strip()
+    clean = clean_name(name)
     if not clean or clean == ticker:
         clean = ticker.split(".")[0]
     clean = clean.replace(".com", "")
@@ -42,8 +48,10 @@ def company_query(name: str, ticker: str) -> str:
         clean = _NAME_SUFFIXES.sub("", clean).strip(" ,.")
     clean = clean.replace('"', "")
     query = f'"{clean}"' if " " in clean else clean
-    if len(clean) <= 4:  # short names (SAP, AUR) are ambiguous and GDELT rejects very short keywords
-        query = f'"{clean}" (stock OR shares OR earnings)'
+    if len(clean) <= 4:
+        # Short names (BYD, NIO, SAP) are ambiguous, and GDELT rejects a quoted phrase that short,
+        # so search for the name next to a market word instead
+        query = f'("{clean} shares" OR "{clean} stock" OR "{clean} earnings")'
     if not ticker.upper().endswith(_GCC_SUFFIXES):
         query += " sourcelang:english"
     return query
@@ -74,22 +82,39 @@ def parse_artlist(payload: dict, limit: int) -> list[dict]:
     return articles
 
 
-def search(query: str, limit: int = 8, timespan: str = "7d") -> list[dict]:
+def _get(params: dict):
     global _last_request
+    wait = _MIN_INTERVAL - (time.monotonic() - _last_request)
+    if wait > 0:
+        time.sleep(wait)
+    try:
+        return requests.get(_API, params=params, timeout=20)
+    finally:
+        _last_request = time.monotonic()
+
+
+def search(query: str, limit: int = 8, timespan: str = "7d") -> list[dict]:
     cache_key = f"gdelt:{timespan}:{limit}:{query}"
     cached = cache.get(cache_key, config.TTL_NEWS)
     if cached is not None:
         return cached
-
-    wait = _MIN_INTERVAL - (time.monotonic() - _last_request)
-    if wait > 0:
-        time.sleep(wait)
-    _last_request = time.monotonic()
+    if STATE["paused"]:
+        STATE["skipped"] += 1
+        return []
 
     params = {"query": query, "mode": "ArtList", "format": "json",
               "maxrecords": limit, "timespan": timespan, "sort": "DateDesc"}
     try:
-        resp = requests.get(_API, params=params, timeout=20)
+        resp = _get(params)
+        if resp.status_code == 429:
+            time.sleep(_RETRY_WAIT)
+            resp = _get(params)
+        if resp.status_code == 429:
+            STATE["refused"] += 1
+            if STATE["refused"] >= _MAX_REFUSALS:
+                STATE["paused"] = True
+                print("  [gdelt] GDELT keeps rate-limiting (HTTP 429) — skipping it for the rest of this run")
+            return []
         if resp.status_code != 200:
             print(f"  [gdelt] '{query}': HTTP {resp.status_code}")
             return []
@@ -138,6 +163,9 @@ def attach_gdelt_news(opportunities: list[Opportunity]) -> list[Opportunity]:
         articles = search(company_query(opp.name, opp.ticker),
                           config.GDELT_ARTICLES, config.GDELT_TIMESPAN)
         opp.news = _merge(opp.news, articles, cap=12)
+    if STATE["skipped"]:
+        print(f"  [gdelt] {STATE['skipped']} tickers without GDELT news this run (rate-limited); "
+              f"other news sources still apply")
     return opportunities
 
 

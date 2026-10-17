@@ -266,6 +266,8 @@ def _card(lines, i, opp: Opportunity):
         lines.append(f"| **EPS surprise (last Q)** | {opp.eps_surprise:+.1f}% |")
     if opp.insider_signal not in ("Neutral", "", "N/A", "Unavailable"):
         lines.append(f"| **Insider activity (30d)** | {opp.insider_signal} — net {opp.insider_net_shares:+,} shares |")
+    if opp.insider_planned_shares:
+        lines.append(f"| **Pre-planned insider sales (30d)** | {opp.insider_planned_shares:,} shares under 10b5-1 plans (not a signal) |")
     if opp.filings:
         shown = sorted(opp.filings, key=lambda f: not f["red_flag"])[:3]
         lines.append("| **Recent SEC filings** | " + " · ".join(

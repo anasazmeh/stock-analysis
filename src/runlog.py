@@ -29,6 +29,9 @@ _IGNORE = re.compile(r"Stage \d|^\s*Traceback \(most recent call last\)|^\s+File
                      r"Avoid-list gate removed 0|No alerts triggered")
 
 
+_DATA_GAP = re.compile(r"\[yfinance\].*(HTTP Error 404|No fundamentals data found|Quote not found)", re.IGNORECASE)
+
+
 def classify(line: str):
     """Return "ERROR", "WARNING" or None for one printed line."""
     if not line.strip() or _IGNORE.search(line):
@@ -95,15 +98,19 @@ class _LibraryHandler(logging.Handler):
 
     def emit(self, record):
         try:
-            msg = f"{record.levelname} [{record.name}] {record.getMessage()}"
+            text = f"[{record.name}] {record.getMessage()}"
         except Exception:
             return
+        level = "ERROR" if record.levelno >= logging.ERROR else "WARNING"
+        if _DATA_GAP.search(text):   # Yahoo has no fundamentals/quote for a symbol: a data gap, not a crash
+            level = "WARNING"
+        msg = f"{level} {text}"
         if self.f is not None:
             try:
                 self.f.write(msg + "\n")
             except ValueError:
                 pass
-        self.collector.add("ERROR" if record.levelno >= logging.ERROR else "WARNING", msg, f"library:{record.name}")
+        self.collector.add(level, msg, f"library:{record.name}")
 
 
 def start(log_dir: str = None, force: bool = False):

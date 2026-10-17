@@ -15,6 +15,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import config
 import src.cache as cache
 from src.models import Opportunity
+from src.symbols import clean_name
 
 # Yahoo quotes some listings in minor units (pence, cents, agorot)
 _MINOR_UNITS = {"GBp": ("GBP", 100), "GBX": ("GBP", 100), "ZAc": ("ZAR", 100), "ILA": ("ILS", 100)}
@@ -106,7 +107,7 @@ def build_opportunity(ticker: str, info: dict) -> Opportunity:
 
     return Opportunity(
         ticker=ticker,
-        name=str(info.get("shortName") or info.get("longName") or ticker)[:40],
+        name=(clean_name(info.get("longName") or info.get("shortName")) or ticker)[:60],
         sector=info.get("sector") or "N/A",
         industry=info.get("industry") or "N/A",
         country=country,

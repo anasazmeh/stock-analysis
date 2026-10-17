@@ -1,0 +1,128 @@
+"""Fixes from the 17 Oct 2026 run log: duplicate listings, GDELT queries and 429s,
+the Nasdaq-100 source, the insider signal and library log levels."""
+import logging
+import os
+import sys
+import tempfile
+import unittest
+from unittest import mock
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+import config
+
+config.CACHE_DIR = tempfile.mkdtemp()
+
+from src import gdelt, insider, runlog, symbols, universe  # noqa: E402
+from src.models import Opportunity  # noqa: E402
+
+
+class NameTests(unittest.TestCase):
+    def test_clean_name(self):
+        self.assertEqual(symbols.clean_name("Siemens Energy AG             N"), "Siemens Energy AG")
+        self.assertEqual(symbols.clean_name("EMAAR PROPERTIES PJSC AED1"), "EMAAR PROPERTIES PJSC")
+        self.assertEqual(symbols.clean_name("ASML Holding N.V. - New York Re"), "ASML Holding N.V.")
+        self.assertEqual(symbols.clean_name(None), "")
+
+    def test_us_and_home_listing_of_asml_collapse(self):
+        opps = [Opportunity(ticker="ASML", name="ASML Holding N.V. - New York Re", country="Netherlands",
+                            price=1600.0, avg_volume=1e6),
+                Opportunity(ticker="ASML.AS", name="ASML HOLDING", country="Netherlands", price=1470.0, avg_volume=5e5)]
+        with mock.patch.object(config, "CURATED_WATCHLIST", ["ASML"]):
+            kept, dropped = symbols.dedupe_listings(opps)
+        self.assertEqual(dropped, {"ASML.AS": "ASML"})            # your curated listing wins
+        with mock.patch.object(config, "CURATED_WATCHLIST", []):
+            kept, dropped = symbols.dedupe_listings(opps)
+        self.assertEqual([o.ticker for o in kept], ["ASML.AS"])   # otherwise the home listing
+        self.assertEqual(dropped, {"ASML": "ASML.AS"})
+
+    def test_siemens_and_siemens_energy_stay_apart(self):
+        self.assertNotEqual(symbols.company_key("Siemens AG"), symbols.company_key("Siemens Energy AG             N"))
+
+
+class GdeltQueryTests(unittest.TestCase):
+    def test_short_names_use_phrases_gdelt_accepts(self):
+        for name, ticker in (("BYD Company Limited", "BYDDY"), ("NIO Inc.", "NIO")):
+            q = gdelt.company_query(name, ticker)
+            short = name.split()[0]
+            self.assertIn(f'"{short} shares"', q)
+            self.assertNotIn(f'"{short}" ', q)   # a lone 3-letter phrase is rejected as "too short"
+
+    def test_messy_names_cleaned(self):
+        self.assertEqual(gdelt.company_query("Siemens Energy AG             N", "ENR.DE"),
+                         '"Siemens Energy" sourcelang:english')
+        self.assertEqual(gdelt.company_query("EMAAR PROPERTIES PJSC AED1", "EMAAR.AE"), '"EMAAR PROPERTIES"')
+
+
+class GdeltRateLimitTests(unittest.TestCase):
+    def setUp(self):
+        gdelt.STATE.update(refused=0, paused=False, skipped=0)
+
+    def tearDown(self):
+        gdelt.STATE.update(refused=0, paused=False, skipped=0)
+
+    def test_retry_once_then_succeed(self):
+        limited = mock.Mock(status_code=429, text="Please limit requests")
+        ok = mock.Mock(status_code=200)
+        ok.json.return_value = {"articles": [{"title": "Story", "seendate": "20261017T100000Z"}]}
+        with mock.patch.object(gdelt.requests, "get", side_effect=[limited, ok]) as get, \
+             mock.patch.object(gdelt.time, "sleep"):
+            self.assertEqual(len(gdelt.search("retry-query-1")), 1)
+        self.assertEqual(get.call_count, 2)
+
+    def test_pauses_after_repeated_refusals(self):
+        limited = mock.Mock(status_code=429, text="Please limit requests")
+        with mock.patch.object(gdelt.requests, "get", return_value=limited) as get, \
+             mock.patch.object(gdelt.time, "sleep"):
+            for i in range(gdelt._MAX_REFUSALS + 4):
+                self.assertEqual(gdelt.search(f"pause-query-{i}"), [])
+        self.assertTrue(gdelt.STATE["paused"])
+        self.assertEqual(get.call_count, gdelt._MAX_REFUSALS * 2)   # nothing sent once paused
+        self.assertEqual(gdelt.STATE["skipped"], 4)
+
+
+class UniverseJsonTests(unittest.TestCase):
+    def test_parse_nasdaq_list_api(self):
+        payload = {"data": {"data": {"rows": [{"symbol": "AAPL"}, {"symbol": "BRK.B"}, {"symbol": ""}]}}}
+        self.assertEqual(universe.parse_index_json(payload), ["AAPL", "BRK-B"])
+        self.assertEqual(universe.parse_index_json({}), [])
+
+    def test_nasdaq_100_no_longer_points_at_wikipedia(self):
+        self.assertIn("api.nasdaq.com", config.UNIVERSE_INDICES["Nasdaq-100"])
+
+
+class InsiderTests(unittest.TestCase):
+    XML = (b"<ownershipDocument>%s<nonDerivativeTable><nonDerivativeTransaction><transactionCoding>"
+           b"<transactionCode>S</transactionCode></transactionCoding><transactionAmounts><transactionShares>"
+           b"<value>%d</value></transactionShares></transactionAmounts></nonDerivativeTransaction>"
+           b"</nonDerivativeTable></ownershipDocument>")
+
+    def test_10b5_1_plan_sales_are_not_a_signal(self):
+        txns = insider.parse_form4_xml(self.XML % (b"<aff10b5One>1</aff10b5One>", 1_000_000))
+        self.assertTrue(txns[0]["plan"])
+        self.assertEqual(insider.compute_signal(txns), ("Neutral", 0))
+        self.assertEqual(insider.planned_sales(txns), 1_000_000)
+
+    def test_small_sales_at_a_giant_are_neutral(self):
+        txns = insider.parse_form4_xml(self.XML % (b"<aff10b5One>0</aff10b5One>", 1_431_378))
+        self.assertEqual(insider.compute_signal(txns, shares_outstanding=24_300_000_000)[0], "Neutral")
+
+    def test_material_discretionary_sales_are_bearish(self):
+        txns = insider.parse_form4_xml(self.XML % (b"", 29_369_611))
+        self.assertEqual(insider.compute_signal(txns, shares_outstanding=1_800_000_000),
+                         ("Bearish", -29_369_611))
+
+
+class LibraryLogTests(unittest.TestCase):
+    def test_missing_fundamentals_is_a_warning_not_an_error(self):
+        collector = runlog._Collector()
+        handler = runlog._LibraryHandler(None, collector)
+        record = logging.LogRecord("yfinance", logging.ERROR, __file__, 1,
+                                   "HTTP Error 404: No fundamentals data found for symbol: DEWA.AE", None, None)
+        handler.emit(record)
+        self.assertEqual(collector.issues[-1]["level"], "WARNING")
+        self.assertTrue(collector.issues[-1]["text"].startswith("WARNING [yfinance]"))
+
+
+if __name__ == "__main__":
+    unittest.main()

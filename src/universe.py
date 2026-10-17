@@ -1,7 +1,8 @@
 """
 Index + Shariah ETF universe for discovery (free, no key).
 
-- Index constituents come from Wikipedia tables (config.UNIVERSE_INDICES).
+- Index constituents come from Wikipedia tables or Nasdaq's public list API
+  (config.UNIVERSE_INDICES); Wikipedia dropped the Nasdaq-100 table in 2026.
 - Shariah ETF holdings come from CSV files the user downloads from the issuer's
   site into config.SHARIAH_ETF_DIR (e.g. data/universe/SPUS.csv). Issuers block
   automated downloads, so these are refreshed by hand.
@@ -24,7 +25,7 @@ import config
 import src.cache as cache
 from src.models import Opportunity
 
-_HEADERS = {"User-Agent": "stock-analysis/1.0 (personal research script)"}
+_HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; stock-analysis/1.0; personal research script)"}
 _TICKER_COLUMNS = ("ticker", "symbol", "ticker symbol", "holding ticker", "code")
 _NOT_TICKERS = {"", "-", "--", "CASH", "USD", "EUR", "N/A", "NA"}
 
@@ -56,15 +57,26 @@ def parse_index_html(html: str) -> list[str]:
     return []
 
 
+def parse_index_json(payload: dict) -> list[str]:
+    """Return tickers from Nasdaq's list API (api.nasdaq.com/api/quote/list-type/...)."""
+    data = (payload or {}).get("data") or {}
+    rows = data.get("rows") or (data.get("data") or {}).get("rows") or []
+    tickers = [_normalize(r.get("symbol", "")) for r in rows if isinstance(r, dict)]
+    return [t for t in tickers if _is_ticker(t)]
+
+
 def fetch_index_constituents(name: str, url: str) -> list[str]:
     cache_key = f"universe:index:{name}"
     cached = cache.get(cache_key, config.TTL_UNIVERSE)
     if cached:
         return cached
     try:
-        resp = requests.get(url, headers=_HEADERS, timeout=20)
+        resp = requests.get(url, headers={**_HEADERS, "Accept": "application/json, text/html"}, timeout=20)
         resp.raise_for_status()
-        tickers = parse_index_html(resp.text)
+        if "json" in resp.headers.get("Content-Type", ""):
+            tickers = parse_index_json(resp.json())
+        else:
+            tickers = parse_index_html(resp.text)
     except Exception as e:
         print(f"  [universe] {name} constituents failed: {e}")
         return []

@@ -96,7 +96,7 @@ class GdeltTests(unittest.TestCase):
         self.assertEqual(gdelt.company_query("Taiwan Semiconductor Manufacturing Company Limited", "TSM"),
                          '"Taiwan Semiconductor Manufacturing" sourcelang:english')
         self.assertEqual(gdelt.company_query("SAP SE", "SAP"),
-                         '"SAP" (stock OR shares OR earnings) sourcelang:english')
+                         '("SAP shares" OR "SAP stock" OR "SAP earnings") sourcelang:english')
         self.assertEqual(gdelt.company_query("Amazon.com, Inc.", "AMZN"),
                          'Amazon sourcelang:english')
         self.assertNotIn("sourcelang", gdelt.company_query("Saudi Arabian Oil Company", "2222.SR"))

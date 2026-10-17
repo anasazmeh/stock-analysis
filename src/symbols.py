@@ -154,11 +154,24 @@ SUFFIX_COUNTRY = {"": "United States", ".DE": "Germany", ".F": "Germany", ".PA":
                   ".HK": "Hong Kong", ".T": "Japan", ".KS": "South Korea", ".NS": "India", ".MI": "Italy", ".MC": "Spain",
                   ".SW": "Switzerland", ".TO": "Canada", ".BR": "Belgium", ".CO": "Denmark", ".ST": "Sweden", ".OL": "Norway"}
 _LEGAL = re.compile(r"\b(inc|incorporated|corp|corporation|co|company|plc|ag|se|sa|nv|n\.v|ltd|limited|holdings?|group|"
-                    r"class [a-c]|cl [a-c]|the|adr|ads|reg|registered|shares?|ord|common)\b\.?")
+                    r"class [a-c]|cl [a-c]|the|adr|ads|cdr|reg|registered|shares?|ord|common|sponsored|depositary|"
+                    r"new york registry|ny registry|pjsc|psc)\b\.?")
+
+
+def clean_name(raw: str) -> str:
+    """Readable company name from a Yahoo name: 'Siemens Energy AG             N' -> 'Siemens Energy AG',
+    'EMAAR PROPERTIES PJSC AED1' -> 'EMAAR PROPERTIES PJSC', 'ASML Holding N.V. - New York Re' -> 'ASML Holding N.V.'."""
+    name = re.sub(r"\s+", " ", str(raw or "")).strip()
+    name = re.split(r"\s+-\s+", name)[0]
+    prev = None
+    while prev != name:
+        prev = name
+        name = re.sub(r"\s+(?:[A-Z]{3}\s?\d+(?:\.\d+)?|[A-Za-z])$", "", name)   # par value (AED1), share-class letter
+    return name
 
 
 def company_key(name: str) -> str:
-    n = (name or "").lower().replace("&", " and ")
+    n = clean_name(name).lower().replace("&", " and ")
     n = _LEGAL.sub(" ", n)
     n = re.sub(r"[^a-z0-9 ]", " ", n)
     words = n.split()
@@ -180,7 +193,7 @@ def dedupe_listings(opportunities: list, keep: set = frozenset()) -> tuple[list,
     groups = {}
     for o in opportunities:
         key = company_key(o.name) if o.price > 0 else ""
-        if not key or key == company_key(o.ticker):
+        if not key or (o.name or "").strip().upper() == o.ticker.upper():   # no real name, only the symbol
             key = "ticker:" + o.ticker
         groups.setdefault(key, []).append(o)
     kept, dropped = [], {}
