@@ -77,7 +77,8 @@ def _get(params: dict):
         return None
     err = is_error_reply(data)
     if err:
-        print(f"  [av] {err}")
+        from src.runlog import redact
+        print(f"  [av] {redact(err)}")
         if "rate limit" in err.lower() or "25 requests" in err or "premium" in err.lower():
             raise QuotaExhausted()
         return None

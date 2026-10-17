@@ -13,8 +13,8 @@ import config
 
 config.CACHE_DIR = tempfile.mkdtemp()
 
-from src import gdelt, insider, runlog, symbols, universe  # noqa: E402
-from src.models import Opportunity  # noqa: E402
+from src import gdelt, insider, output_gate, runlog, symbols, tech_debt, universe  # noqa: E402
+from src.models import AnalysisResult, MacroContext, Opportunity  # noqa: E402
 
 
 class NameTests(unittest.TestCase):
@@ -122,6 +122,55 @@ class LibraryLogTests(unittest.TestCase):
         handler.emit(record)
         self.assertEqual(collector.issues[-1]["level"], "WARNING")
         self.assertTrue(collector.issues[-1]["text"].startswith("WARNING [yfinance]"))
+
+
+
+class AvoidListInputTests(unittest.TestCase):
+    """A headline or a Claude sentence naming an avoided company must not fail the run or hide a stock."""
+
+    def test_mentions_removed_where_they_enter(self):
+        o = Opportunity(ticker="NVDA", name="NVIDIA", price=200.0,
+                        news=[{"title": "Palantir and Nvidia sign AI deal"}, {"title": "Nvidia beats estimates"}],
+                        analysis=AnalysisResult(thesis="Data-centre demand is strong. Peers like PLTR also gain. Margins hold.",
+                                                catalysts=["Blackwell ramp", "Contract shared with Palantir"]))
+        macro = MacroContext(themes=["AI capex", "Grab Holdings IPO lock-up"],
+                             macro_news=[{"title": "PLTR jumps"}, {"title": "Fed holds rates"}])
+        self.assertEqual(output_gate.scrub_inputs([o], macro), 5)
+        self.assertEqual([a["title"] for a in o.news], ["Nvidia beats estimates"])   # the stock stays, the headline goes
+        self.assertEqual(o.analysis.thesis, "Data-centre demand is strong. Margins hold.")
+        self.assertEqual(o.analysis.catalysts, ["Blackwell ramp"])
+        self.assertEqual(macro.themes, ["AI capex"])
+        self.assertEqual(macro.macro_news, [{"title": "Fed holds rates"}])
+        self.assertEqual(output_gate.scrub_inputs([o], macro), 0)
+
+    def test_gate_message_is_visible_on_the_dashboard(self):
+        with open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "main.py")) as f:
+            line = next(l for l in f if "Avoid-list gate removed" in l)
+        self.assertEqual(output_gate.find_violations(line), [])
+        self.assertNotIn("AVOID_LIST)}", line)
+
+
+class SecretRedactionTests(unittest.TestCase):
+    AV_REPLY = ("We have detected your API key as DEMOKEY0EXAMPLE1 and our standard API rate limit "
+                "is 25 requests per day.")
+
+    def test_alpha_vantage_reply_hides_the_key(self):
+        self.assertNotIn("DEMOKEY0EXAMPLE1", runlog.redact(self.AV_REPLY))
+        self.assertIn("API key as ***", runlog.redact(self.AV_REPLY))
+
+    def test_configured_secrets_hidden(self):
+        with mock.patch.object(config, "FINNHUB_API_KEY", "fh_secret_value_123"):
+            self.assertEqual(runlog.redact("token fh_secret_value_123 rejected"), "token *** rejected")
+
+    def test_tech_debt_cleans_new_and_stored_keys(self):
+        d = tempfile.mkdtemp()
+        path, md = os.path.join(d, "td.json"), os.path.join(d, "TD.md")
+        tech_debt.update([{"level": "WARNING", "text": "  [av] " + self.AV_REPLY, "source": "stdout"}],
+                         path=path, md_path=md)
+        with open(md) as f:
+            self.assertNotIn("DEMOKEY0EXAMPLE1", f.read())
+        with open(path) as f:
+            self.assertNotIn("DEMOKEY0EXAMPLE1", f.read())
 
 
 if __name__ == "__main__":

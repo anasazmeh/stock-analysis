@@ -17,10 +17,28 @@ import logging
 import re
 from datetime import datetime
 
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import config
+
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _LOG_DIR = os.path.join(_ROOT, "logs")
 KEEP = 30
 _state = {}
+_SECRET_NAMES = ("ALPHA_VANTAGE_API_KEY", "FINNHUB_API_KEY", "FRED_API_KEY", "NEWSAPI_KEY", "ARGAAM_API_KEY",
+                 "ANTHROPIC_API_KEY", "ALERT_SMTP_PASSWORD", "ALERT_WEBHOOK_URL", "HEALTHCHECK_URL",
+                 "DASHBOARD_PASSWORD_HASH", "DASHBOARD_SECRET_KEY")
+_KEY_ECHO = re.compile(r"(api[ _-]?key(?: is| as|=|:)\s*)[A-Za-z0-9_\-]{8,}", re.IGNORECASE)
+
+
+def redact(text: str) -> str:
+    """Hide API keys and passwords, e.g. Alpha Vantage's 'We have detected your API key as …' reply."""
+    if not text:
+        return text
+    for name in _SECRET_NAMES:
+        value = os.environ.get(name) or getattr(config, name, "")
+        if isinstance(value, str) and len(value) >= 8 and value in text:
+            text = text.replace(value, "***")
+    return _KEY_ECHO.sub(r"\1***", text)
 
 _ERROR = re.compile(r"Traceback|^\s*\w+(Error|Exception)\b|\bError\b|\berror\b|\bfailed\b|FAILED|✗|❌|HTTP Error \d+")
 _WARN = re.compile(r"[Ww]arning|⚠|\bskipped\b|no price|[Mm]ismatch|not found|unavailable|DEGRADED|"
@@ -65,6 +83,7 @@ class _Tee:
         self.stream, self.f, self.collector = stream, f, collector
 
     def write(self, data):
+        data = redact(data)
         self.stream.write(data)
         if self.f is not None:
             try:
@@ -104,7 +123,7 @@ class _LibraryHandler(logging.Handler):
         level = "ERROR" if record.levelno >= logging.ERROR else "WARNING"
         if _DATA_GAP.search(text):   # Yahoo has no fundamentals/quote for a symbol: a data gap, not a crash
             level = "WARNING"
-        msg = f"{level} {text}"
+        msg = redact(f"{level} {text}")
         if self.f is not None:
             try:
                 self.f.write(msg + "\n")
