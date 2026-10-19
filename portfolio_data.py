@@ -35,6 +35,21 @@ HOLDINGS = [
     {"ticker": "PHAG.AS", "name": "WisdomTree Physical Silver ETC",    "shares": 26, "bep": 61.59,  "bep_currency": "EUR", "status": "🟢 HOLD", "asset_type": "ETC", "themes": ["Precious metals"], "shariah_note": "Silver ETC — same AAOIFI SS-57 conditions as gold. Check the issuer's prospectus."},   # JE00B1VS3333, Amsterdam (EUR)
 ]
 
+# Open orders at your broker. Delete a line when it fills or you cancel it (then update HOLDINGS and CASH_EUR).
+# limit and currency as shown in the order; GTC = good till cancelled. Checked every run on the Sell review tab.
+OPEN_ORDERS = [
+    {"ticker": "TSM",  "side": "Sell", "qty": 10, "limit": 490.00,  "currency": "USD", "validity": "GTC", "placed": "2026-10-18"},
+    {"ticker": "CRWD", "side": "Sell", "qty": 8,  "limit": 245.00,  "currency": "USD", "validity": "GTC", "placed": "2026-10-18"},
+    {"ticker": "AVGO", "side": "Sell", "qty": 4,  "limit": 350.00,  "currency": "USD", "validity": "GTC", "placed": "2026-10-18"},
+    {"ticker": "CRDO", "side": "Sell", "qty": 6,  "limit": 210.00,  "currency": "USD", "validity": "GTC", "placed": "2026-10-18"},
+    {"ticker": "NVDA", "side": "Sell", "qty": 10, "limit": 240.00,  "currency": "USD", "validity": "GTC", "placed": "2026-10-18"},
+    {"ticker": "MSFT", "side": "Sell", "qty": 6,  "limit": 560.00,  "currency": "USD", "validity": "GTC", "placed": "2026-10-18"},
+    {"ticker": "AMZN", "side": "Sell", "qty": 10, "limit": 280.00,  "currency": "USD", "validity": "GTC", "placed": "2026-10-18"},
+    {"ticker": "ASML", "side": "Sell", "qty": 1,  "limit": 1720.00, "currency": "EUR", "validity": "GTC", "placed": "2026-10-19"},
+    {"ticker": "TEM",  "side": "Sell", "qty": 10, "limit": 69.00,   "currency": "EUR", "validity": "GTC", "placed": "2026-10-19"},
+    {"ticker": "SAP",  "side": "Sell", "qty": 10, "limit": 240.40,  "currency": "EUR", "validity": "GTC", "placed": "2026-10-19"},
+]
+
 # Cash you hold at each broker, in EUR (update when it changes). Used by the Cash plan tab:
 # the reserve it recommends counts this cash first, before any sale proceeds.
 CASH_EUR = {"DEGIRO": 3118.49, "Revolut": 0.0}   # DEGIRO: account statement, 19 Oct 2026 16:32

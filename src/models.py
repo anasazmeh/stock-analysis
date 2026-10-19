@@ -184,6 +184,8 @@ class Opportunity:
     # Sell review (holdings only): price facts for exits and the verdict
     exit_metrics: dict = field(default_factory=dict)   # drawdown from 6m high, trailing stop, 3m return
     sell_review: dict = field(default_factory=dict)    # {category, strength, action}
+    # Open orders at your broker for this ticker (src/orders.py)
+    open_orders: list = field(default_factory=list)
     # Pipeline outputs
     analysis: Optional[AnalysisResult] = None
     risk: Optional[RiskProfile] = None

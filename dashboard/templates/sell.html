@@ -33,6 +33,7 @@
       {% if m.return_3m_pct is not none %}<span>3 months <b>{{ m.return_3m_pct | pct }}</b></span>{% endif %}
       {% if m.vs_ma200_pct is not none %}<span>vs 200-day <b>{{ m.vs_ma200_pct | pct }}</b></span>{% endif %}
     </div>{% endif %}
+    {% for oo in r.open_orders or [] %}<div class="muted" style="margin-top:6px">📋 Open order: {{ oo.side | lower }} {{ oo.qty | num(0) }} @ {{ oo.limit | num }} {{ oo.currency }}{% if oo.distance_pct is not none %} · {{ oo.status }}{% endif %}</div>{% endfor %}
     {% if r.notes %}<ul class="sell-notes">{% for n in r.notes %}<li>{{ n }}</li>{% endfor %}</ul>{% endif %}
   {% endif %}
 </article>
@@ -53,6 +54,31 @@
     <div class="muted">realising {{ totals.realised | eur(True) }}</div></div>
   <div class="kpi"><div class="label">No signal</div><div class="value">{{ holds | length }}</div><div class="muted">of {{ rows | length }} holdings</div></div>
 </section>
+
+{% set oo = d.open_orders or [] %}
+{% if oo %}
+<section class="panel">
+  <h2>Your open orders</h2>
+  <p class="sub">Checked against this run's prices. They are not cash until they fill — the Cash plan doesn't count them.</p>
+  <div class="table-wrap"><table class="sortable">
+    <thead><tr><th data-sort>Order</th><th data-sort class="num">Limit</th><th data-sort class="num">Price now</th>
+      <th data-sort class="num">To fill</th><th data-sort class="num">If filled</th><th data-sort class="num">Gain vs breakeven</th>
+      <th data-sort class="num">Of position</th><th class="wrap">Checks</th></tr></thead>
+    <tbody>{% for r in oo %}
+      <tr><td><a href="{{ url_for('stock', ticker=r.ticker) }}"><strong>{{ r.side }} {{ r.qty | num(0) }} {{ r.ticker }}</strong></a>
+          <div class="muted">{{ r.validity }}{% if r.placed %} · since {{ r.placed }}{% endif %}</div></td>
+        <td class="num" data-value="{{ r.limit }}">{{ r.limit | num }} {{ r.currency }}</td>
+        <td class="num" data-value="{{ r.price or '' }}">{{ r.price | num }}</td>
+        <td class="num" data-value="{{ r.distance_pct if r.distance_pct is not none else '' }}">
+          {% if r.status == 'Fills now' %}<span class="chip good">fills now</span>{% elif r.status == 'Close' %}<span class="chip warn">{{ r.distance_pct | pct }}</span>{% else %}{{ r.distance_pct | pct }}{% endif %}</td>
+        <td class="num" data-value="{{ r.value_eur or '' }}">{{ r.value_eur | eur }}</td>
+        <td class="num" data-value="{{ r.gain_pct if r.gain_pct is not none else '' }}">{{ r.gain_pct | pct }}{% if r.gain_eur is not none %}<div class="muted">{{ r.gain_eur | eur(True) }}</div>{% endif %}</td>
+        <td class="num" data-value="{{ r.share_of_position_pct or '' }}">{{ r.share_of_position_pct | pct(False) }}</td>
+        <td class="wrap muted">{{ r.checks | join(' ') or '–' }}</td></tr>
+    {% endfor %}</tbody>
+  </table></div>
+</section>
+{% endif %}
 
 {% if act and d.sell_notes %}
 <section class="panel" style="border-color: var(--warn)"><h2>Before you sell</h2>

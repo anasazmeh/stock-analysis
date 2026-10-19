@@ -300,6 +300,20 @@ def _section_sell(lines, rows):
     lines += ["", f"*Before selling: {config.BROKER_COST_NOTE} {tax_note()}*", "", "---", ""]
 
 
+def _section_orders(lines, rows):
+    lines += ["## 📋 Open Orders", "",
+              "Your orders at the broker, checked against this run's prices. Not counted as cash until they fill.", "",
+              "| Order | Limit | Price now | To fill | If filled ≈ EUR | Gain vs breakeven | Checks |",
+              "|---|---:|---:|---:|---:|---:|---|"]
+    for r in rows:
+        price = f"{r['price']:,.2f}" if r["price"] else "n/a"
+        dist = f"{r['distance_pct']:+.1f}%" if r["distance_pct"] is not None else "n/a"
+        gain = f"{r['gain_pct']:+.0f}%" if r["gain_pct"] is not None else "n/a"
+        lines.append(f"| {r['side']} {r['qty']:g} {r['ticker']} | {r['limit']:,.2f} {r['currency']} | {price} | {dist} | "
+                     f"{_eur(r['value_eur'])} | {gain} | {' '.join(r['checks']).replace('|', '/') or '–'} |")
+    lines += ["", "---", ""]
+
+
 def _section_cash(lines, plan):
     s, m = plan["scenarios"][0], plan["market"]
     lines += ["## 💶 Cash Plan", "",
@@ -417,7 +431,8 @@ def _section_methodology(lines, run_date):
 def generate_report(opportunities: list[Opportunity], macro: MacroContext, *, health=None, fx=None,
                     exposure: dict = None, unpriced: list = None, changes: list = None,
                     purification_rows: list = None, broker_diffs: list = None, scorecard: dict = None,
-                    av_stats: dict = None, sell_rows: list = None, cash_plan: dict = None) -> tuple[str, list[Opportunity]]:
+                    av_stats: dict = None, sell_rows: list = None, cash_plan: dict = None,
+                    order_rows: list = None) -> tuple[str, list[Opportunity]]:
     """Render the report. Returns (markdown, top10)."""
     run_date = datetime.now().strftime("%B %d, %Y — %H:%M")
     from src.ranking import top_ranked
@@ -435,6 +450,8 @@ def generate_report(opportunities: list[Opportunity], macro: MacroContext, *, he
                        unpriced or [], exposure or {}, fx, purification_rows or [], broker_diffs, scorecard)
     if sell_rows:
         _section_sell(lines, sell_rows)
+    if order_rows:
+        _section_orders(lines, order_rows)
     if cash_plan:
         _section_cash(lines, cash_plan)
     _section_top10(lines, top10)
