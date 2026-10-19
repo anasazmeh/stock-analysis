@@ -247,11 +247,14 @@ def main() -> int:
     changes = what_changed(opportunities, ranked_now[:10], previous)
     unpriced = unpriced_holdings(opportunities)
     sell_rows = review_holdings(opportunities, fx, broker_diffs)
+    from src.orders import evaluate_orders, summary as orders_summary
+    order_rows = evaluate_orders(opportunities, fx, sell_rows)
     cash_plan = build_cash_plan(opportunities, sell_rows, macro, benchmarks, fx, exposure)
+    cash_plan["open_orders"] = orders_summary(order_rows)
     report, top10 = generate_report(opportunities, macro, health=HEALTH, fx=fx, exposure=exposure,
                                     unpriced=unpriced, changes=changes,
                                     purification_rows=pur, broker_diffs=broker_diffs, scorecard=card,
-                                    av_stats=av_stats, sell_rows=sell_rows, cash_plan=cash_plan)
+                                    av_stats=av_stats, sell_rows=sell_rows, cash_plan=cash_plan, order_rows=order_rows)
     report, removed = scrub(report)
     path = save_report(report)
     write_snapshot(opportunities, top10, HEALTH, prompt_digest,
@@ -261,7 +264,7 @@ def main() -> int:
     _, removed_dash = write_latest(build_payload(
         opportunities, macro, health=HEALTH, fx=fx, exposure=exposure, unpriced=unpriced, top10=top10,
         alerts=alerts, changes=changes, purification_rows=pur, broker_diffs=broker_diffs, scorecard=card,
-        sell_rows=sell_rows, cash_plan=cash_plan))
+        sell_rows=sell_rows, cash_plan=cash_plan, order_rows=order_rows))
     removed_alerts += removed_dash
 
     print(f"\n{'=' * 60}\n  ✅ Report: {path}\n{'=' * 60}\n")

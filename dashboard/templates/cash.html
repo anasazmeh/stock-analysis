@@ -16,6 +16,9 @@
       <div class="muted">{{ s.cash_end_pct | pct(False) }} of {{ s.portfolio_after_eur | eur }}</div></div>
   </section>
 
+  {% set oo = plan.open_orders if plan and plan.open_orders else none %}
+  {% if oo and oo.count %}<p class="muted">📋 {{ oo.count }} open sell order(s) would add ≈ {{ oo.value_eur | eur }} if they all fill{% if oo.fills_now %} ({{ oo.fills_now }} at or below today's price){% endif %} — not counted above until they fill. <a href="{{ url_for('sell') }}">See them on Sell review</a>.</p>{% endif %}
+
   {% set total = s.available_eur if s.available_eur and s.available_eur > 0 else 1 %}
   <section class="panel">
     <h2>Where the money goes</h2>
