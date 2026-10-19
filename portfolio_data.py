@@ -13,31 +13,31 @@ Fields:
 """
 
 HOLDINGS = [
-    {"ticker": "NIO",   "name": "NIO Inc (ADR)",        "shares": 26,  "bep": 42.78,  "bep_currency": "USD", "status": "🔴 Consider EXIT", "asset_type": "Stock", "themes": ["EV / China"]},
+    # From the DEGIRO account statement of 19 Oct 2026 (all trades since Jul 2020, splits included).
+    # Sold on 19 Oct 2026: NIO, AUR, BYDDY, LCID, MMYT.
     {"ticker": "TSM",   "name": "Taiwan Semiconductor", "shares": 20,  "bep": 150.25, "bep_currency": "USD", "status": "🟢 HOLD/ADD", "asset_type": "Stock", "themes": ["AI / Semiconductors"]},
     {"ticker": "AMZN",  "name": "Amazon.com",           "shares": 20,  "bep": 167.12, "bep_currency": "USD", "status": "🟢 HOLD",     "asset_type": "Stock", "themes": ["Cloud / Hyperscalers"]},
     {"ticker": "ASML",  "name": "ASML Holding",         "shares": 2,   "bep": 701.00, "bep_currency": "EUR", "status": "🟡 TRIM",     "asset_type": "Stock", "themes": ["AI / Semiconductors"]},
-    {"ticker": "AUR",   "name": "Aurora Innovation",    "shares": 100, "bep": 6.15,   "bep_currency": "USD", "status": "🟢 HOLD/ADD", "asset_type": "Stock", "themes": ["Autonomy"]},
     {"ticker": "AVGO",  "name": "Broadcom",             "shares": 4,   "bep": 290.00, "bep_currency": "USD", "status": "🟢 HOLD",     "asset_type": "Stock", "themes": ["AI / Semiconductors"]},
-    {"ticker": "BYDDY", "name": "BYD Co (ADR)",         "shares": 90,  "bep": 12.20,  "bep_currency": "EUR", "status": "🟡 HOLD",     "asset_type": "Stock", "themes": ["EV / China"]},
     {"ticker": "CRDO",  "name": "Credo Technology",     "shares": 13,  "bep": 90.00,  "bep_currency": "USD", "status": "🟢 HOLD",     "asset_type": "Stock", "themes": ["AI / Semiconductors"]},
-    {"ticker": "CRWD",  "name": "CrowdStrike",          "shares": 2,   "bep": 310.00, "bep_currency": "USD", "status": "🟢 HOLD/ADD", "asset_type": "Stock", "themes": ["Software"]},
-    {"ticker": "LCID",  "name": "Lucid Group",          "shares": 1,   "bep": 161.20, "bep_currency": "USD", "status": "🔴 Consider EXIT", "asset_type": "Stock", "themes": ["EV / China"]},
+    # 4-for-1 split on 2 Jul 2026: 2 shares @ 772.74 became 8 @ 193.19
+    {"ticker": "CRWD",  "name": "CrowdStrike",          "shares": 8,   "bep": 193.19, "bep_currency": "USD", "status": "🟢 HOLD/ADD", "asset_type": "Stock", "themes": ["Software"]},
     {"ticker": "NVDA",  "name": "NVIDIA",               "shares": 30,  "bep": 99.00,  "bep_currency": "USD", "status": "🟢 HOLD",     "asset_type": "Stock", "themes": ["AI / Semiconductors"]},
     {"ticker": "MSFT",  "name": "Microsoft",            "shares": 12,  "bep": 381.20, "bep_currency": "USD", "status": "🟢 HOLD/ADD", "asset_type": "Stock", "themes": ["Cloud / Hyperscalers"]},
-    {"ticker": "MMYT",  "name": "MakeMyTrip",           "shares": 45,  "bep": 43.30,  "bep_currency": "USD", "status": "🟢 HOLD",     "asset_type": "Stock", "themes": ["India consumer"]},
     {"ticker": "SAP",   "name": "SAP SE",               "shares": 20,  "bep": 147.00, "bep_currency": "EUR", "status": "🟢 HOLD/ADD", "asset_type": "Stock", "themes": ["Software"]},
     {"ticker": "TEM",   "name": "Tempus AI",            "shares": 10,  "bep": 55.00,  "bep_currency": "EUR", "status": "🟡 WATCH",    "asset_type": "Stock", "themes": ["Health AI"]},
+    # Leftover from Wish/ContextLogic (ISIN change Aug 2025), traded over the counter
+    {"ticker": "LOGC",  "name": "ContextLogic Holdings", "shares": 4,  "bep": 7.50,   "bep_currency": "USD", "status": "🟡 WATCH",    "asset_type": "Stock", "themes": ["Other"]},
 
-    # Funds: set "ticker" to the Yahoo symbol of the exact line you hold (see the DEGIRO product page)
-    {"ticker": "", "name": "iShares Nasdaq-100 UCITS ETF",   "shares": 28, "bep": 148.97, "bep_currency": "EUR", "status": "🟢 HOLD", "asset_type": "ETF", "themes": ["Broad US tech"], "shariah_note": "Conventional index fund — not Shariah-screened. Shariah alternatives: ISUS (iShares MSCI USA Islamic), ISWD (iShares MSCI World Islamic)."},
-    {"ticker": "", "name": "WisdomTree Physical Gold ETC",   "shares": 5,  "bep": 479.00, "bep_currency": "USD", "status": "🟢 HOLD", "asset_type": "ETC", "themes": ["Precious metals"], "shariah_note": "Gold ETC — permissible only if it meets AAOIFI Shariah Standard 57 (allocated, physically backed, no interest). Check the issuer's prospectus."},
-    {"ticker": "", "name": "WisdomTree Physical Silver ETC", "shares": 26, "bep": 61.59,  "bep_currency": "EUR", "status": "🟢 HOLD", "asset_type": "ETC", "themes": ["Precious metals"], "shariah_note": "Silver ETC — same AAOIFI SS-57 conditions as gold. Check the issuer's prospectus."},
+    # Funds — Yahoo symbol of a listing in the currency you bought in (ISIN in the comment)
+    {"ticker": "EXXT.DE", "name": "iShares Nasdaq-100 UCITS ETF (DE)", "shares": 28, "bep": 148.97, "bep_currency": "EUR", "status": "🟢 HOLD", "asset_type": "ETF", "themes": ["Broad US tech"], "shariah_note": "Conventional index fund — not Shariah-screened. Shariah alternatives: ISUS (iShares MSCI USA Islamic), ISWD (iShares MSCI World Islamic)."},   # DE000A0F5UF5, Xetra
+    {"ticker": "PHAU.L",  "name": "WisdomTree Physical Gold ETC",      "shares": 5,  "bep": 479.00, "bep_currency": "USD", "status": "🟢 HOLD", "asset_type": "ETC", "themes": ["Precious metals"], "shariah_note": "Gold ETC — permissible only if it meets AAOIFI Shariah Standard 57 (allocated, physically backed, no interest). Check the issuer's prospectus."},   # JE00B1VS3770, London (USD)
+    {"ticker": "PHAG.AS", "name": "WisdomTree Physical Silver ETC",    "shares": 26, "bep": 61.59,  "bep_currency": "EUR", "status": "🟢 HOLD", "asset_type": "ETC", "themes": ["Precious metals"], "shariah_note": "Silver ETC — same AAOIFI SS-57 conditions as gold. Check the issuer's prospectus."},   # JE00B1VS3333, Amsterdam (EUR)
 ]
 
 # Cash you hold at each broker, in EUR (update when it changes). Used by the Cash plan tab:
 # the reserve it recommends counts this cash first, before any sale proceeds.
-CASH_EUR = {"DEGIRO": 0.0, "Revolut": 0.0}
+CASH_EUR = {"DEGIRO": 3118.49, "Revolut": 0.0}   # DEGIRO: account statement, 19 Oct 2026 16:32
 
 # Money you will need from the portfolio within 12 months (tuition, a car, ...). Always kept as cash.
 # Your emergency fund should sit outside the portfolio and is not counted here.

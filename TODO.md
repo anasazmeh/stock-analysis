@@ -17,11 +17,11 @@ Setup on the Mac
 - [ ] Add `FRED_API_KEY` once received (re-run `bash scripts/setup.sh`; it only asks for missing keys)
 
 Portfolio data
-- [ ] Yahoo tickers for the Nasdaq-100 ETF, gold ETC and silver ETC in `portfolio_data.py` (unpriced until set)
+- [x] Yahoo tickers for the Nasdaq-100 ETF (EXXT.DE), gold ETC (PHAU.L) and silver ETC (PHAG.AS) in `portfolio_data.py`
 - [ ] Keep `shares` / `bep` current after each trade — or put DEGIRO / Revolut CSV exports in `data/broker/`
 - [ ] Copy `data/theses.example.json` → `data/theses.json`; write a thesis and sell rules per holding
 - [ ] Set `TAX_RESIDENCE` in `config.py` (also sets the tax the Cash plan keeps aside)
-- [ ] Set `CASH_EUR` (cash at DEGIRO / Revolut) and `PLANNED_WITHDRAWALS_EUR` in `portfolio_data.py` for the Cash plan
+- [ ] Set `CASH_EUR` (cash at DEGIRO / Revolut) and `PLANNED_WITHDRAWALS_EUR` in `portfolio_data.py` for the Cash plan — DEGIRO done (19 Oct 2026); Revolut cash and planned withdrawals still 0
 - [ ] Check `BROKER_FEE_EUR` / `FX_FEE_PCT` in `config.py` against your broker's price list
 
 After the first real run
@@ -86,7 +86,6 @@ weekday cron job (default 07:00, your computer's time). It is safe to re-run; `-
 
 ### 3. Keep Portfolio Data Current
 - `portfolio_data.py`: update `bep` and `shares` after every trade.
-- **Set the Yahoo tickers of your three funds** (Nasdaq-100 ETF, gold ETC, silver ETC) — they show as "not priced" until then.
 - Export DEGIRO / Revolut CSVs into `data/broker/` — every run then checks `portfolio_data.py` against them.
 - Copy `data/theses.example.json` to `data/theses.json` and write a thesis + invalidation rules per holding.
 - Add your own dates (IPO lock-ups, AGMs) to `data/events.json`.
