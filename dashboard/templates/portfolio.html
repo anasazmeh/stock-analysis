@@ -83,6 +83,18 @@
       {% if p.broker_diffs %}<ul class="list">{% for x in p.broker_diffs %}<li><strong>{{ x.ticker }}</strong>: {{ x.issue }}</li>{% endfor %}</ul>
       {% else %}<p><span class="chip good">matches</span> portfolio_data.py matches your broker exports.</p>{% endif %}
     {% endif %}
+    {% if p.realised %}{% set rz = p.realised %}
+      <h2 style="margin-top:16px">Realised P&amp;L (sold shares)</h2>
+      <p>Total <strong class="{{ 'up' if rz.total_eur >= 0 else 'down' }}">{{ rz.total_eur | eur(True) }}</strong>
+        · this year {{ rz.this_year_eur | eur(True) }} · gains {{ rz.gains_eur | eur(True) }} · losses {{ rz.losses_eur | eur(True) }}
+        <span class="muted">(EUR, fees and FX included; dividends not included)</span></p>
+      <details><summary class="muted">Per company</summary>
+        <div class="table-wrap"><table class="sortable">
+          <thead><tr><th data-sort>Company</th><th data-sort>Last sale</th><th data-sort class="num">Realised</th></tr></thead>
+          <tbody>{% for r in rz.positions %}<tr><td>{{ r.name | title }}{% if r.still_held %} <span class="muted">(part still held)</span>{% endif %}</td>
+            <td>{{ r.last_sale }}</td><td class="num {{ 'up' if r.realised_eur >= 0 else 'down' }}" data-value="{{ r.realised_eur }}">{{ r.realised_eur | eur(True) }}</td></tr>{% endfor %}</tbody>
+        </table></div></details>
+    {% endif %}
     {% if p.scorecard %}
       <h2 style="margin-top:16px">Scorecard</h2>
       <p>Since {{ p.scorecard.since }}: portfolio {{ pl(p.scorecard.portfolio_pct) }} vs {{ p.scorecard.benchmark }} {{ pl(p.scorecard.benchmark_pct) }}

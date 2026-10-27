@@ -54,6 +54,15 @@ def opportunity_row(opp: Opportunity, top10: set) -> dict:
     }
 
 
+def _realised():
+    try:
+        from src.broker_import import realised_summary
+        return realised_summary()
+    except Exception as e:   # a malformed export must not break the dashboard
+        print(f"  [broker] realised P&L skipped: {type(e).__name__}")
+        return None
+
+
 def build_payload(opportunities: list[Opportunity], macro: MacroContext, *, health, fx, exposure: dict,
                   unpriced: list, top10: list, alerts: list, changes: list, purification_rows: list,
                   broker_diffs, scorecard: dict, sell_rows: list = None, cash_plan: dict = None, now: datetime = None,
@@ -85,6 +94,7 @@ def build_payload(opportunities: list[Opportunity], macro: MacroContext, *, heal
             "unpriced": [_asdict(p) for p in unpriced],
             "purification": [{"ticker": t, **r} for t, r in purification_rows],
             "broker_diffs": broker_diffs,
+            "realised": _realised(),
             "scorecard": scorecard,
         },
         "opportunities": rows,
