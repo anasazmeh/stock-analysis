@@ -61,6 +61,7 @@ def create_app(report_dir: str = None, runs_dir: str = None, run_cmd: list = Non
         return {
             "nav_alert_count": sum(1 for a in alerts if a["level"] in ("DANGER", "BUY")),
             "nav_sell_count": sum(1 for r in (data or {}).get("sell_review", []) if r.get("strength") == "Strong"),
+            "nav_kpi_bad": ((data or {}).get("kpis") or {}).get("counts", {}).get("bad", 0),
             "run_at": (data or {}).get("run_at", ""),
             "degraded": (data or {}).get("degraded", False),
             "degraded_reasons": (data or {}).get("degraded_reasons", []),
@@ -193,6 +194,17 @@ def create_app(report_dir: str = None, runs_dir: str = None, run_cmd: list = Non
             abort(404)
         alerts = [a for a in data["alerts"] if a["ticker"] == ticker]
         return render_template("stock.html", d=data, o=o, alerts=alerts)
+
+    @app.route("/kpis")
+    def kpis():
+        data = load_latest()
+        if not data:
+            return empty()
+        k = data.get("kpis") or {}
+        groups = {}
+        for item in k.get("items", []):
+            groups.setdefault(item["group"], []).append(item)
+        return render_template("kpis.html", d=data, k=k, groups=groups)
 
     @app.route("/history")
     def history():

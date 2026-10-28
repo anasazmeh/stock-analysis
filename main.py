@@ -251,20 +251,28 @@ def main() -> int:
     order_rows = evaluate_orders(opportunities, fx, sell_rows)
     cash_plan = build_cash_plan(opportunities, sell_rows, macro, benchmarks, fx, exposure)
     cash_plan["open_orders"] = orders_summary(order_rows)
+    from src.kpis import build_kpis, numbers as kpi_numbers
+    from src.cash_plan import cash_balances
+    cash_now = sum(v for v in cash_balances().values() if v)
+    kpis = build_kpis(opportunities, exposure, fx, cash=cash_now, orders=cash_plan["open_orders"], scorecard=card,
+                      benchmarks=benchmarks, market_level=(cash_plan.get("market") or {}).get("level", ""),
+                      purification_rows=pur)
     report, top10 = generate_report(opportunities, macro, health=HEALTH, fx=fx, exposure=exposure,
                                     unpriced=unpriced, changes=changes,
                                     purification_rows=pur, broker_diffs=broker_diffs, scorecard=card,
-                                    av_stats=av_stats, sell_rows=sell_rows, cash_plan=cash_plan, order_rows=order_rows)
+                                    av_stats=av_stats, sell_rows=sell_rows, cash_plan=cash_plan, order_rows=order_rows,
+                                    kpis=kpis)
     report, removed = scrub(report)
     path = save_report(report)
     write_snapshot(opportunities, top10, HEALTH, prompt_digest,
-                   portfolio_value_eur=exposure.get("total_value_eur"), benchmark_close=bench_close)
+                   portfolio_value_eur=exposure.get("total_value_eur"), benchmark_close=bench_close,
+                   cash_eur=cash_now, kpis=kpi_numbers(kpis))
     append_decisions(opportunities, top10)
     alerts, removed_alerts = dispatch_alerts(opportunities, macro, HEALTH, exposure, previous, broker_diffs)
     _, removed_dash = write_latest(build_payload(
         opportunities, macro, health=HEALTH, fx=fx, exposure=exposure, unpriced=unpriced, top10=top10,
         alerts=alerts, changes=changes, purification_rows=pur, broker_diffs=broker_diffs, scorecard=card,
-        sell_rows=sell_rows, cash_plan=cash_plan, order_rows=order_rows))
+        sell_rows=sell_rows, cash_plan=cash_plan, order_rows=order_rows, kpis=kpis))
     removed_alerts += removed_dash
 
     print(f"\n{'=' * 60}\n  ✅ Report: {path}\n{'=' * 60}\n")

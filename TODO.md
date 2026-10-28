@@ -87,6 +87,8 @@ weekday cron job (default 07:00, your computer's time). It is safe to re-run; `-
 ### 3. Keep Portfolio Data Current
 - `portfolio_data.py`: update `bep` and `shares` after every trade.
 - Export DEGIRO / Revolut CSVs into `data/broker/` — every run then checks `portfolio_data.py` against them.
+- Put the DEGIRO account statement (Inbox → Account statement, CSV or Excel) in `data/broker/` too — the KPIs tab
+  uses it for money in/out, XIRR, dividends, withholding tax and costs. Refresh both files every month or two.
 - Copy `data/theses.example.json` to `data/theses.json` and write a thesis + invalidation rules per holding.
 - Add your own dates (IPO lock-ups, AGMs) to `data/events.json`.
 - Set `TAX_RESIDENCE` in `config.py`.

@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}KPIs · Portfolio Desk{% endblock %}
+{% set CHIP = {'good': 'good', 'warn': 'warn', 'bad': 'bad', 'na': 'muted'} %}
+{% set WORD = {'good': 'Good', 'warn': 'Watch', 'bad': 'Act', 'na': 'Info'} %}
+{% block content %}
+<section>
+  <h1>KPIs</h1>
+  <p class="sub">The numbers an adviser would track, each checked against your profile
+    {% if d.profile %}(+{{ d.profile.target_return_pct | num(0) }}% in {{ d.profile.horizon_months }} months, −{{ d.profile.max_drawdown_pct | num(0) }}% drop tolerance, caps per stock and theme){% else %}(balanced settings, caps per stock and theme){% endif %}.
+    {% if k.statement_until %}Account statement up to {{ k.statement_until }}.{% endif %}</p>
+</section>
+
+{% if not k.items %}
+<section class="panel"><p>No KPIs in this run yet. Press Refresh to create them.</p></section>
+{% else %}
+<section class="kpis">
+  <div class="kpi"><div class="label">Value now</div><div class="value">{{ k.total_value_eur | eur }}</div>
+    <div class="muted">holdings {{ k.holdings_eur | eur }} + cash {{ k.cash_eur | eur }}</div></div>
+  {% if k.net_invested_eur is not none %}
+  <div class="kpi"><div class="label">Net money in</div><div class="value">{{ k.net_invested_eur | eur }}</div>
+    <div class="muted">deposits − withdrawals</div></div>
+  <div class="kpi"><div class="label">Gain</div><div class="value {{ 'up' if k.total_value_eur >= k.net_invested_eur else 'down' }}">{{ (k.total_value_eur - k.net_invested_eur) | eur(True) }}</div>
+    <div class="muted">on your money</div></div>
+  {% endif %}
+  <div class="kpi"><div class="label">Status</div><div class="value">
+    <span class="chip good">{{ k.counts.good }}</span> <span class="chip warn">{{ k.counts.warn }}</span> <span class="chip bad">{{ k.counts.bad }}</span></div>
+    <div class="muted">good · watch · act</div></div>
+</section>
+
+{% for g in ['Return', 'Risk', 'Costs', 'Decisions', 'Readiness'] %}{% if groups.get(g) %}
+<section class="panel">
+  <h2>{{ g }}</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>KPI</th><th class="num">Value</th><th>Status</th><th>Target</th><th class="num">A month ago</th><th class="wrap">What it means</th></tr></thead>
+    <tbody>{% for i in groups[g] %}
+      <tr><td><strong>{{ i.name }}</strong></td>
+        <td class="num">{{ i.value }}</td>
+        <td><span class="chip {{ CHIP[i.status] }}">{{ WORD[i.status] }}</span></td>
+        <td class="muted">{{ i.target or '' }}</td>
+        <td class="num muted">{% if i.prev is defined and i.prev is not none %}{{ i.prev | num(1) }}<div style="font-size:11px">{{ i.prev_date }}</div>{% else %}–{% endif %}</td>
+        <td class="wrap muted">{{ i.detail }}</td></tr>
+    {% endfor %}</tbody>
+  </table></div>
+</section>
+{% endif %}{% endfor %}
+
+{% if k.account_years %}
+<section class="panel">
+  <h2>Money in and out per year</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Year</th><th class="num">Deposits</th><th class="num">Withdrawals</th><th class="num">Dividends (after tax)</th><th class="num">Fees</th></tr></thead>
+    <tbody>{% for y, v in k.account_years.items() %}
+      <tr><td>{{ y }}</td><td class="num">{{ v.get('deposit', 0) | eur }}</td><td class="num">{{ (-(v.get('withdrawal', 0))) | eur }}</td>
+        <td class="num">{{ (v.get('dividend', 0) + v.get('div_tax', 0)) | eur }}</td>
+        <td class="num">{{ (v.get('trade_fee', 0) + v.get('data_fee', 0) + v.get('connect_fee', 0) + v.get('adr_fee', 0)) | eur }}</td></tr>
+    {% endfor %}</tbody>
+  </table></div>
+  <p class="muted">Dividends and fees in other currencies are converted at this run's ECB rate.</p>
+</section>
+{% endif %}
+{% endif %}
+{% endblock %}

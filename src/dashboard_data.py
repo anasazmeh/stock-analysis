@@ -66,7 +66,7 @@ def _realised():
 def build_payload(opportunities: list[Opportunity], macro: MacroContext, *, health, fx, exposure: dict,
                   unpriced: list, top10: list, alerts: list, changes: list, purification_rows: list,
                   broker_diffs, scorecard: dict, sell_rows: list = None, cash_plan: dict = None, now: datetime = None,
-                  order_rows: list = None) -> dict:
+                  order_rows: list = None, kpis: dict = None) -> dict:
     now = now or datetime.now()
     top = {o.ticker for o in top10}
     rows = [opportunity_row(o, top) for o in opportunities
@@ -101,6 +101,8 @@ def build_payload(opportunities: list[Opportunity], macro: MacroContext, *, heal
         "sell_review": [r for r in (sell_rows or []) if r["ticker"] not in config.AVOID_LIST],
         "tax_residence": config.TAX_RESIDENCE,
         "cash_plan": cash_plan,
+        "kpis": kpis,
+        "profile": config.INVESTOR_PROFILE if config.PROFILE_ON else None,
         "open_orders": [r for r in (order_rows or []) if r["ticker"] not in config.AVOID_LIST],
         "sell_notes": [config.BROKER_COST_NOTE, tax_note()],
         "sell_settings": {"stop_loss_pct": config.SELL_STOP_LOSS_PCT, "take_profit_pct": config.SELL_TAKE_PROFIT_PCT,

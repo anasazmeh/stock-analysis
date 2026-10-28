@@ -74,7 +74,8 @@ Set `"enabled": False` to go back to the balanced defaults.
 | `data/theses.json` | Thesis and sell-discipline rules per holding (copy `data/theses.example.json`) |
 | `data/events.json` | Your own dates, e.g. IPO lock-up ends |
 | `data/universe/*.csv` | Shariah ETF holdings downloaded from the issuer (e.g. `SPUS.csv`) |
-| `data/broker/*.csv` | DEGIRO / Revolut exports for reconciliation (git-ignored) |
+| `data/broker/*.csv` | DEGIRO / Revolut exports for reconciliation and realised P&L (git-ignored) |
+| `data/broker/Account.*` | DEGIRO account statement (CSV or Excel) — money in/out, dividends and fees for the KPIs tab |
 | `data/decisions.jsonl` | Decision journal — fill in `user_action` |
 | `config.py` | Watchlist, caps, thresholds, Shariah methodology, rank weights |
 
