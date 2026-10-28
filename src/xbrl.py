@@ -72,8 +72,8 @@ def fill_missing(cik: str, inputs: dict) -> dict:
 
 def fill_from_sec(opportunities) -> int:
     """Fill missing Shariah inputs for US-listed tickers. Returns how many were filled."""
-    from src.sec import load_ticker_cik_map, cik_for
-    targets = [o for o in opportunities if o.price > 0 and "." not in o.ticker
+    from src.sec import load_ticker_cik_map, cik_for, sec_symbol
+    targets = [o for o in opportunities if o.price > 0 and sec_symbol(o.ticker)
                and o.quote_type != "ETF"
                and any((o.shariah_inputs or {}).get(k) is None for k in CONCEPTS)]
     if not targets:

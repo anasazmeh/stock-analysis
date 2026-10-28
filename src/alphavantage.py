@@ -101,7 +101,9 @@ def run_alpha_vantage(opportunities: list[Opportunity]) -> dict:
     stats = {"earnings_dates": 0, "eps_surprises": 0, "targets": 0, "budget_left": 0, "stopped": ""}
     if not config.ALPHA_VANTAGE_API_KEY:
         return stats
-    us = [o for o in opportunities if o.price > 0 and "." not in o.ticker]
+    from src.sec import sec_symbol
+    sym = {o.ticker: sec_symbol(o.ticker) for o in opportunities}   # ASML.AS → ASML (config.US_LISTING)
+    us = [o for o in opportunities if o.price > 0 and sym[o.ticker]]
     try:
         # 1. Earnings calendar (one call)
         rows = cache.get("av:earnings_calendar", config.TTL_EARNINGS)
@@ -109,7 +111,7 @@ def run_alpha_vantage(opportunities: list[Opportunity]) -> dict:
             rows = parse_calendar(_get({"function": "EARNINGS_CALENDAR", "horizon": "3month"}))
             if rows:
                 cache.set("av:earnings_calendar", rows)
-        by_ticker = {o.ticker: o for o in us}
+        by_ticker = {sym[o.ticker]: o for o in us}
         for row in rows or []:
             o = by_ticker.get(row.get("symbol", ""))
             if o and not o.earnings_date and row.get("reportDate"):
@@ -118,11 +120,11 @@ def run_alpha_vantage(opportunities: list[Opportunity]) -> dict:
 
         # 2. EPS surprise, holdings first
         for opp in _priority([o for o in us if o.eps_surprise is None]):
-            data = cache.get(f"av:earnings:{opp.ticker}", config.TTL_EARNINGS)
+            data = cache.get(f"av:earnings:{sym[opp.ticker]}", config.TTL_EARNINGS)
             if not data:
-                data = _get({"function": "EARNINGS", "symbol": opp.ticker})
+                data = _get({"function": "EARNINGS", "symbol": sym[opp.ticker]})
                 if data:
-                    cache.set(f"av:earnings:{opp.ticker}", data)
+                    cache.set(f"av:earnings:{sym[opp.ticker]}", data)
             q = (data or {}).get("quarterlyEarnings") or []
             if q and q[0].get("surprisePercentage") not in (None, "None", ""):
                 try:
@@ -134,7 +136,8 @@ def run_alpha_vantage(opportunities: list[Opportunity]) -> dict:
                 break
 
         # 3. Missing analyst targets
-        for opp in _priority([o for o in us if not o.target]):
+        # Targets are in the US listing's currency, so only for US tickers themselves
+        for opp in _priority([o for o in us if not o.target and sym[o.ticker] == o.ticker]):
             data = cache.get(f"av:overview:{opp.ticker}", config.TTL_FUNDAMENTALS)
             if not data:
                 data = _get({"function": "OVERVIEW", "symbol": opp.ticker})
