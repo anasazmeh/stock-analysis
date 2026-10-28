@@ -98,8 +98,9 @@ def parse_recent_filings(cik: str, recent: dict, days: int, forms: set) -> list[
 
 
 def fetch_recent_filings(opportunities: list[Opportunity]) -> list[Opportunity]:
-    """Attach recent SEC filings to US-listed opportunities (tickers without a '.')."""
-    us_opps = [o for o in opportunities if "." not in o.ticker]
+    """Attach recent SEC filings to US-listed opportunities and mapped home listings (config.US_LISTING)."""
+    from src.sec import sec_symbol
+    us_opps = [o for o in opportunities if sec_symbol(o.ticker)]
     if not us_opps:
         return opportunities
     cik_map = _load_ticker_cik_map()

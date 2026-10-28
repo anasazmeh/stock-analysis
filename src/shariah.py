@@ -150,9 +150,10 @@ def debt_events(opp: Opportunity) -> list[str]:
 
 
 def second_opinion_links(ticker: str) -> dict:
-    if "." in ticker:
+    from src.sec import sec_symbol
+    sym = sec_symbol(ticker).replace("-", ".")
+    if not sym:
         return {}
-    sym = ticker.replace("-", ".")
     return {"Musaffa": f"https://musaffa.com/stock/{sym}", "Zoya": f"https://zoya.finance/stocks/{sym.lower()}"}
 
 

@@ -33,7 +33,15 @@ def load_ticker_cik_map() -> dict:
     return mapping
 
 
+def sec_symbol(ticker: str) -> str:
+    """The symbol to look up at the SEC: US tickers as-is, mapped home listings (ASML.AS → ASML), else ""."""
+    if ticker in config.US_LISTING:
+        return config.US_LISTING[ticker]
+    return "" if "." in ticker else ticker
+
+
 def cik_for(ticker: str, cik_map: dict) -> str:
+    ticker = sec_symbol(ticker) or ticker
     return cik_map.get(ticker.replace("-", "."), cik_map.get(ticker, ""))
 
 

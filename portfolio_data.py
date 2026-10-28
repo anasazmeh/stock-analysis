@@ -18,12 +18,13 @@ HOLDINGS = [
     # Sold on 19 Oct 2026: NIO, AUR, BYDDY, LCID, MMYT. Sold on 27 Oct 2026: CRWD (8 @ 270 USD, GTC order filled).
     {"ticker": "TSM",   "isin": "US8740391003", "name": "Taiwan Semiconductor", "shares": 20,  "bep": 150.25, "bep_currency": "USD", "status": "🟢 HOLD/ADD", "asset_type": "Stock", "themes": ["AI / Semiconductors"]},
     {"ticker": "AMZN",  "isin": "US0231351067", "name": "Amazon.com",           "shares": 20,  "bep": 167.12, "bep_currency": "USD", "status": "🟢 HOLD",     "asset_type": "Stock", "themes": ["Cloud / Hyperscalers"]},
-    {"ticker": "ASML",  "isin": "NL0010273215", "name": "ASML Holding",         "shares": 2,   "bep": 701.00, "bep_currency": "EUR", "status": "🟡 TRIM",     "asset_type": "Stock", "themes": ["AI / Semiconductors"]},
+    # ASML and SAP: the euro lines you hold (Amsterdam, Xetra); SEC data still comes via config.US_LISTING
+    {"ticker": "ASML.AS", "isin": "NL0010273215", "name": "ASML Holding",         "shares": 2,   "bep": 701.00, "bep_currency": "EUR", "status": "🟡 TRIM",     "asset_type": "Stock", "themes": ["AI / Semiconductors"]},
     {"ticker": "AVGO",  "isin": "US11135F1012", "name": "Broadcom",             "shares": 4,   "bep": 290.00, "bep_currency": "USD", "status": "🟢 HOLD",     "asset_type": "Stock", "themes": ["AI / Semiconductors"]},
     {"ticker": "CRDO",  "isin": "KYG254571055", "name": "Credo Technology",     "shares": 13,  "bep": 90.00,  "bep_currency": "USD", "status": "🟢 HOLD",     "asset_type": "Stock", "themes": ["AI / Semiconductors"]},
     {"ticker": "NVDA",  "isin": "US67066G1040", "name": "NVIDIA",               "shares": 30,  "bep": 99.00,  "bep_currency": "USD", "status": "🟢 HOLD",     "asset_type": "Stock", "themes": ["AI / Semiconductors"]},
     {"ticker": "MSFT",  "isin": "US5949181045", "name": "Microsoft",            "shares": 12,  "bep": 381.20, "bep_currency": "USD", "status": "🟢 HOLD/ADD", "asset_type": "Stock", "themes": ["Cloud / Hyperscalers"]},
-    {"ticker": "SAP",   "isin": "DE0007164600", "name": "SAP SE",               "shares": 20,  "bep": 147.00, "bep_currency": "EUR", "status": "🟢 HOLD/ADD", "asset_type": "Stock", "themes": ["Software"]},
+    {"ticker": "SAP.DE", "isin": "DE0007164600", "name": "SAP SE",               "shares": 20,  "bep": 147.00, "bep_currency": "EUR", "status": "🟢 HOLD/ADD", "asset_type": "Stock", "themes": ["Software"]},
     {"ticker": "TEM",   "isin": "US88023B1035", "name": "Tempus AI",            "shares": 10,  "bep": 55.00,  "bep_currency": "EUR", "status": "🟡 WATCH",    "asset_type": "Stock", "themes": ["Health AI"]},
     # Leftover from Wish/ContextLogic (ISIN change Aug 2025), traded over the counter
     {"ticker": "LOGC",  "isin": "US21078F1093", "name": "ContextLogic Holdings", "shares": 4,  "bep": 7.50,   "bep_currency": "USD", "status": "🟡 WATCH",    "asset_type": "Stock", "themes": ["Other"]},
@@ -43,9 +44,9 @@ OPEN_ORDERS = [
     {"ticker": "NVDA", "side": "Sell", "qty": 10, "limit": 240.00,  "currency": "USD", "validity": "GTC", "placed": "2026-10-18"},
     {"ticker": "MSFT", "side": "Sell", "qty": 6,  "limit": 560.00,  "currency": "USD", "validity": "GTC", "placed": "2026-10-18"},
     {"ticker": "AMZN", "side": "Sell", "qty": 10, "limit": 280.00,  "currency": "USD", "validity": "GTC", "placed": "2026-10-18"},
-    {"ticker": "ASML", "side": "Sell", "qty": 1,  "limit": 1720.00, "currency": "EUR", "validity": "GTC", "placed": "2026-10-19"},
+    {"ticker": "ASML.AS", "side": "Sell", "qty": 1,  "limit": 1720.00, "currency": "EUR", "validity": "GTC", "placed": "2026-10-19"},
     {"ticker": "TEM",  "side": "Sell", "qty": 10, "limit": 69.00,   "currency": "EUR", "validity": "GTC", "placed": "2026-10-19"},
-    {"ticker": "SAP",  "side": "Sell", "qty": 10, "limit": 240.40,  "currency": "EUR", "validity": "GTC", "placed": "2026-10-19"},
+    {"ticker": "SAP.DE", "side": "Sell", "qty": 10, "limit": 240.40,  "currency": "EUR", "validity": "GTC", "placed": "2026-10-19"},
 ]
 
 # Cash you hold at each broker, in EUR (update when it changes). Used by the Cash plan tab:

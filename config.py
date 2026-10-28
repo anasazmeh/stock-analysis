@@ -113,9 +113,10 @@ CURATED_WATCHLIST = {
     "JPM":   ("US",          "Diversified banking — AI capital markets"),
     "CRWD":  ("US",          "AI-native cybersecurity platform"),
 
+    # ── Europe (home listing in EUR — no currency conversion; SEC data via US_LISTING) ──
+    "ASML.AS": ("Netherlands", "EUV lithography monopoly"),
+    "SAP.DE":  ("Germany",     "Enterprise AI software"),
     # ── Europe (US ADR) ───────────────────────────────────────────────────
-    "ASML":  ("Netherlands", "EUV lithography monopoly"),
-    "SAP":   ("Germany",     "Enterprise AI software"),
     "AZN":   ("UK",          "Pharma — rich oncology pipeline"),
     "NVO":   ("Denmark",     "Ozempic/Wegovy GLP-1 leader"),
     "ARGX":  ("Belgium",     "Biotech — autoimmune disease"),
@@ -443,16 +444,22 @@ SUPPLY_CHAIN_GEO = {
     "AMD":  ("High", "Chips made by TSMC in Taiwan; China export controls"),
     "ARM":  ("Medium", "Licensees concentrated in Taiwan/China"),
     "ASML": ("Medium", "China export licences (Dutch/US rules)"),
+    "ASML.AS": ("Medium", "China export licences (Dutch/US rules)"),
     "AAPL": ("Medium", "Assembly in China; chips from TSMC"),
 }
+
+# European home listings of companies that also file with the SEC (20-F). Prices come from the
+# home listing (EUR); SEC filings and the IFRS figures used for the Shariah ratios are looked up
+# under the US symbol.
+US_LISTING = {"ASML.AS": "ASML", "SAP.DE": "SAP"}
 
 # Regulatory themes watched in the US Federal Register (BIS = Bureau of Industry and Security)
 GEO_LOOKBACK_DAYS = 21
 GEO_THEMES = {
     "US chip export controls": {"term": "semiconductor",
-                                "tickers": ["NVDA", "AMD", "AVGO", "TSM", "ASML", "CRDO", "MU", "ARM"]},
+                                "tickers": ["NVDA", "AMD", "AVGO", "TSM", "ASML", "ASML.AS", "CRDO", "MU", "ARM"]},
     "BIS Entity List changes": {"term": "entity list",
-                                "tickers": ["NVDA", "AMD", "TSM", "ASML", "NIO", "BYDDY", "BABA", "BIDU"]},
+                                "tickers": ["NVDA", "AMD", "TSM", "ASML", "ASML.AS", "NIO", "BYDDY", "BABA", "BIDU"]},
 }
 
 # ── Region map — company home country → display region ───────────────

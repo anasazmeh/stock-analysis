@@ -162,7 +162,9 @@ def _fetch_fred_indicators() -> dict:
 
 def _fetch_finnhub_news(ticker: str, limit: int = 5) -> list[dict]:
     """Finnhub company news — North American symbols only."""
-    if not config.FINNHUB_API_KEY or "." in ticker:
+    from src.sec import sec_symbol
+    ticker = sec_symbol(ticker)      # ASML.AS → ASML; other non-US symbols → ""
+    if not config.FINNHUB_API_KEY or not ticker:
         return []
     cache_key = f"news:finnhub:{ticker}"
     cached = cache.get(cache_key, config.TTL_NEWS)
