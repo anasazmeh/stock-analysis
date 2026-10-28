@@ -202,6 +202,19 @@ def validate(raw: dict, packs: dict) -> dict:
     return out
 
 
+# Why the last Claude call failed (shown in Data Health), and whether to stop trying this run
+LAST_ERROR = {"text": "", "fatal": False}
+_FATAL = ("/login", "log in", "logged in", "not authenticated", "authentication", "usage limit", "limit reached",
+          "limit will reset", "rate limit", "credit balance", "expired", "unauthorized", "401", "403")
+
+
+def _note_error(e: Exception):
+    text = f"{type(e).__name__}: {str(e)[:200]}"
+    LAST_ERROR["text"] = text
+    if any(s in text.lower() for s in _FATAL):
+        LAST_ERROR["fatal"] = True
+
+
 def ai_available() -> bool:
     """claude-cli: the `claude` command is installed · api: a key is set · off: never."""
     if config.AI_BACKEND == "claude-cli":
@@ -323,11 +336,18 @@ def analyze_tickers(opportunities: list[Opportunity], macro: MacroContext) -> tu
         hashes.append(digest)
         key = f"ai:v2:{digest}"
         cached = cache.get(key, config.TTL_AI)
+        if LAST_ERROR["fatal"] and not cached:
+            return []          # Claude can't be reached this run (login / usage limit) — don't wait on every batch
         try:
             raw = cached or _call(client, prompt, _ANALYSIS_SCHEMA)
             results = validate(raw, packs)
         except errors as e:
+            _note_error(e)
             print(f"  [intelligence] batch {list(packs)} failed: {type(e).__name__}: {str(e)[:120]}")
+            if LAST_ERROR["fatal"]:
+                print("  [intelligence] Claude can't be used right now — skipping the remaining batches. "
+                      "Run `claude` in Terminal to check the login or usage limit.")
+                return []
             return list(packs)
         if not cached and len(results) == len(packs):
             cache.set(key, raw)  # only cache complete, validated answers
@@ -375,7 +395,8 @@ def build_macro_analysis(macro: MacroContext, opportunities: list[Opportunity]) 
     try:
         result = cached or _call(_client(), prompt, _MACRO_SCHEMA)
     except _ai_errors() as e:
-        print(f"  [intelligence] Macro analysis failed: {type(e).__name__}")
+        _note_error(e)
+        print(f"  [intelligence] Macro analysis failed: {LAST_ERROR['text'][:160]}")
         return macro
     if not cached:
         cache.set(f"ai:macro:v2:{digest}", result)
