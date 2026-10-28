@@ -195,6 +195,8 @@ INVESTOR_PROFILE = {
     "target_return_pct": 100.0,   # aim: double the money ...
     "horizon_months":    12,      # ... within this many months
     "max_drawdown_pct":  50.0,    # drop on a single stock you accept while waiting for it to pay off
+    "start_date":        "2026-10-28",   # the KPIs tab measures the goal from the first run on/after this date
+    "start_value_eur":   None,    # or set the starting value yourself (holdings + cash, EUR)
 }
 PROFILE_ON = bool(INVESTOR_PROFILE.get("enabled"))
 

@@ -41,6 +41,9 @@ class Position:
     cost_eur: float = 0.0     # EUR paid for the open shares, fees and FX included (DEGIRO)
     realised_eur: float = 0.0  # EUR gained (+) or lost (-) on shares already sold
     last_sale: str = ""
+    opened: str = ""           # first buy of the current holding period
+    period_realised: float = 0.0
+    periods: list = field(default_factory=list)   # closed holding periods: {opened, closed, realised_eur}
 
     @property
     def avg_cost(self):
@@ -52,6 +55,8 @@ class Position:
         the new line instead of being booked as a sale. Returns the EUR cost handed over."""
         handed = 0.0
         if qty > 0:
+            if self.shares < 1e-9 and not self.opened:
+                self.opened = when
             self.cost += qty * price
             self.shares += qty
             if carried_eur is not None:
@@ -64,12 +69,19 @@ class Position:
             if corporate and total_eur:
                 handed = self.cost_eur * part
             elif total_eur is not None:   # a sale; a zero-value write-off (delisting, leftover fraction) is a loss
-                self.realised_eur += total_eur - self.cost_eur * part
+                gain = total_eur - self.cost_eur * part
+                self.realised_eur += gain
+                self.period_realised += gain
                 self.last_sale = when
             self.cost_eur -= self.cost_eur * part
             self.cost -= self.cost / self.shares * sold
             self.shares -= sold
         if self.shares < 1e-9:
+            if qty < 0 and not (corporate and total_eur) and self.opened:
+                self.periods.append({"opened": self.opened[:10], "closed": when[:10],
+                                     "realised_eur": round(self.period_realised, 2)})
+            if not (corporate and total_eur):   # a split/ISIN change hands the period over to the new line
+                self.opened, self.period_realised = "", 0.0
             self.shares = self.cost = self.cost_eur = 0.0
         return handed
 
@@ -116,10 +128,17 @@ def parse_degiro(text: str, include_closed: bool = False) -> dict:
         pos.name = row[idx["product"]] or pos.name
         total = _num(row[idx["total_eur"]]) if "total_eur" in idx and row[idx["total_eur"]].strip() else None
         qty, day, corp = _num(row[idx["qty"]]), _when(row, idx)[:10], corporate(row)
-        carried = carry.pop(day, None) if corp and qty > 0 else None
-        handed = pos.apply(qty, _num(row[idx["price"]]), total, _when(row, idx), corp, carried)
+        incoming = carry.pop(day, None) if corp and qty > 0 else None
+        if incoming and pos.shares < 1e-9:
+            pos.opened, pos.period_realised = incoming["opened"] or pos.opened, incoming["realised"]
+        opened, period = pos.opened, pos.period_realised
+        handed = pos.apply(qty, _num(row[idx["price"]]), total, _when(row, idx), corp,
+                           incoming["cost"] if incoming else None)
         if handed:
-            carry[day] = carry.get(day, 0.0) + handed
+            c = carry.setdefault(day, {"cost": 0.0, "opened": opened, "realised": period})
+            c["cost"] += handed
+            if pos.shares < 1e-9:
+                pos.opened, pos.period_realised = "", 0.0
     return {k: p for k, p in positions.items() if include_closed or p.shares > 1e-6}
 
 
@@ -151,17 +170,37 @@ def load_positions(folder: str = None) -> list[Position]:
     return out
 
 
+def trade_costs(text: str) -> list[tuple]:
+    """[(iso date, EUR)] currency-conversion (AutoFX) costs from a DEGIRO Transactions export."""
+    reader = csv.reader(text.splitlines())
+    header = next(reader, [])
+    if "AutoFX Fee" not in header or "Date" not in header:
+        return []
+    i_fx, i_d = header.index("AutoFX Fee"), header.index("Date")
+    out = []
+    for r in reader:
+        if len(r) > i_fx and r[i_fx].strip():
+            m = re.match(r"(\d{2})-(\d{2})-(\d{4})", r[i_d])
+            if m and _num(r[i_fx]):
+                out.append((f"{m.group(3)}-{m.group(2)}-{m.group(1)}", -abs(_num(r[i_fx]))))
+    return out
+
+
 def realised_summary(folder: str = None) -> dict | None:
     """Realised P&L in EUR (fees and FX included) from the DEGIRO export(s), per company and in total."""
     folder = folder or _DIR
-    rows = []
+    rows, periods, fx_costs = [], [], set()
     for path in sorted(glob.glob(os.path.join(folder, "*.csv"))):
         with open(path, encoding="utf-8-sig", errors="replace") as f:
-            parsed = parse_degiro(f.read(), include_closed=True)
+            text = f.read()
+        parsed = parse_degiro(text, include_closed=True)
+        fx_costs |= set(trade_costs(text))
+        periods += [{**pr, "name": p.name} for p in parsed.values() for pr in p.periods]
         rows += [{"name": p.name, "isin": p.key, "realised_eur": round(p.realised_eur, 2), "last_sale": p.last_sale[:10],
                   "still_held": p.shares > 1e-6} for p in parsed.values() if abs(p.realised_eur) >= 0.005]
     from src.output_gate import find_violations
     rows = [r for r in rows if not find_violations(f"{r['name']} {r['isin']}")]
+    periods = _merge_periods([p for p in periods if not find_violations(p["name"])])
     if not rows:
         return None
     rows.sort(key=lambda r: r["last_sale"], reverse=True)
@@ -169,7 +208,22 @@ def realised_summary(folder: str = None) -> dict | None:
             "gains_eur": round(sum(r["realised_eur"] for r in rows if r["realised_eur"] > 0), 2),
             "losses_eur": round(sum(r["realised_eur"] for r in rows if r["realised_eur"] < 0), 2),
             "this_year_eur": round(sum(r["realised_eur"] for r in rows if r["last_sale"][:4] == _year()), 2),
-            "positions": rows}
+            "positions": rows, "periods": periods,
+            "fx_costs": sorted(fx_costs)}
+
+
+def _merge_periods(periods: list[dict]) -> list[dict]:
+    """A reverse split can leave a write-off on the old ISIN: same company, same start → one holding period."""
+    merged = {}
+    for p in sorted(periods, key=lambda p: p["closed"]):
+        key = (p["opened"], (p["name"].split() or [""])[0].lower().strip(",."))
+        if key in merged:
+            m = merged[key]
+            m["realised_eur"] = round(m["realised_eur"] + p["realised_eur"], 2)
+            m["closed"] = max(m["closed"], p["closed"])
+        else:
+            merged[key] = dict(p)
+    return sorted(merged.values(), key=lambda p: p["closed"], reverse=True)
 
 
 def _year() -> str:

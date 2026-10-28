@@ -125,12 +125,15 @@ def scorecard(current_value_eur: float, benchmark_close: float, runs_dir: str = 
 
 def write_snapshot(opportunities: list[Opportunity], top10: list[Opportunity], health, prompt_hash: str = "",
                    runs_dir: str = None, now: datetime = None, portfolio_value_eur: float = None,
-                   benchmark_close: float = None) -> str:
+                   benchmark_close: float = None, cash_eur: float = None, kpis: dict = None) -> str:
     runs_dir = runs_dir or RUNS_DIR
     now = now or datetime.now()
     os.makedirs(runs_dir, exist_ok=True)
     snap = {
         "portfolio_value_eur": portfolio_value_eur,
+        "cash_eur": cash_eur,
+        "total_value_eur": round((portfolio_value_eur or 0) + (cash_eur or 0), 2) if portfolio_value_eur else None,
+        "kpis": kpis or {},
         "benchmark_close": benchmark_close,
         "run_at": now.isoformat(timespec="seconds"),
         "git_sha": _git_sha(),

@@ -300,6 +300,17 @@ def _section_sell(lines, rows):
     lines += ["", f"*Before selling: {config.BROKER_COST_NOTE} {tax_note()}*", "", "---", ""]
 
 
+def _section_kpis(lines, kpis):
+    icon = {"good": "🟢", "warn": "🟡", "bad": "🔴", "na": "⚪"}
+    c = kpis["counts"]
+    lines += ["## 📊 KPIs", "", f"{c['good']} good · {c['warn']} to watch · {c['bad']} to act on.", "",
+              "| | KPI | Value | Target | Detail |", "|---|---|---|---|---|"]
+    for k in kpis["items"]:
+        lines.append(f"| {icon[k['status']]} | {k['group']}: {k['name']} | {k['value']} | {k['target'] or ''} | "
+                     f"{k['detail'].replace('|', '/')} |")
+    lines += ["", "---", ""]
+
+
 def _section_orders(lines, rows):
     lines += ["## 📋 Open Orders", "",
               "Your orders at the broker, checked against this run's prices. Not counted as cash until they fill.", "",
@@ -432,7 +443,7 @@ def generate_report(opportunities: list[Opportunity], macro: MacroContext, *, he
                     exposure: dict = None, unpriced: list = None, changes: list = None,
                     purification_rows: list = None, broker_diffs: list = None, scorecard: dict = None,
                     av_stats: dict = None, sell_rows: list = None, cash_plan: dict = None,
-                    order_rows: list = None) -> tuple[str, list[Opportunity]]:
+                    order_rows: list = None, kpis: dict = None) -> tuple[str, list[Opportunity]]:
     """Render the report. Returns (markdown, top10)."""
     run_date = datetime.now().strftime("%B %d, %Y — %H:%M")
     from src.ranking import top_ranked
@@ -452,6 +463,8 @@ def generate_report(opportunities: list[Opportunity], macro: MacroContext, *, he
         _section_sell(lines, sell_rows)
     if order_rows:
         _section_orders(lines, order_rows)
+    if kpis:
+        _section_kpis(lines, kpis)
     if cash_plan:
         _section_cash(lines, cash_plan)
     _section_top10(lines, top10)
