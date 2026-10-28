@@ -26,8 +26,10 @@ HOLDINGS = [
     {"ticker": "MSFT",  "isin": "US5949181045", "name": "Microsoft",            "shares": 12,  "bep": 381.20, "bep_currency": "USD", "status": "🟢 HOLD/ADD", "asset_type": "Stock", "themes": ["Cloud / Hyperscalers"]},
     {"ticker": "SAP.DE", "isin": "DE0007164600", "name": "SAP SE",               "shares": 20,  "bep": 147.00, "bep_currency": "EUR", "status": "🟢 HOLD/ADD", "asset_type": "Stock", "themes": ["Software"]},
     {"ticker": "TEM",   "isin": "US88023B1035", "name": "Tempus AI",            "shares": 10,  "bep": 55.00,  "bep_currency": "EUR", "status": "🟡 WATCH",    "asset_type": "Stock", "themes": ["Health AI"]},
-    # Leftover from Wish/ContextLogic (ISIN change Aug 2025), traded over the counter
-    {"ticker": "LOGC",  "isin": "US21078F1093", "name": "ContextLogic Holdings", "shares": 4,  "bep": 7.50,   "bep_currency": "USD", "status": "🟡 WATCH",    "asset_type": "Stock", "themes": ["Other"]},
+    # Wish/ContextLogic: 125 shares bought Apr 2021 for EUR 1,559.68 (fees + FX included), 1:32 reverse split Apr 2023
+    # and two ISIN changes in 2025 → 4 shares. Breakeven = that real cost (EUR 1,559.68 / 4), not the
+    # 7.50 USD price DEGIRO shows after the ISIN change. Traded over the counter.
+    {"ticker": "LOGC",  "isin": "US21078F1093", "name": "ContextLogic Holdings", "shares": 4,  "bep": 389.92, "bep_currency": "EUR", "status": "🟡 WATCH",    "asset_type": "Stock", "themes": ["Other"]},
 
     # Funds — Yahoo symbol of a listing in the currency you bought in (ISIN in the comment)
     {"ticker": "EXXT.DE", "isin": "DE000A0F5UF5", "name": "iShares Nasdaq-100 UCITS ETF (DE)", "shares": 28, "bep": 148.97, "bep_currency": "EUR", "status": "🟢 HOLD", "asset_type": "ETF", "themes": ["Broad US tech"], "shariah_note": "Conventional index fund — not Shariah-screened. Shariah alternatives: ISUS (iShares MSCI USA Islamic), ISWD (iShares MSCI World Islamic)."},   # DE000A0F5UF5, Xetra
