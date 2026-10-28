@@ -228,7 +228,9 @@ def main() -> int:
         macro = build_macro_analysis(macro, opportunities)
         opportunities, prompt_digest = analyze_tickers(opportunities, macro)
         n = sum(o.analysis is not None for o in opportunities)
-        HEALTH.record("Claude analysis", _status(n, sum(o.data_ok for o in priced)), f"{n} tickers")
+        from src.intelligence import LAST_ERROR
+        HEALTH.record("Claude analysis", _status(n, sum(o.data_ok for o in priced)), f"{n} tickers"
+                      + (f" — last error: {LAST_ERROR['text']}" if LAST_ERROR["text"] and n < sum(o.data_ok for o in priced) else ""))
     else:
         HEALTH.record("Claude analysis", "skipped", "--no-ai, AI_BACKEND=off, or `claude` not installed")
     scrub_inputs(opportunities, macro)   # Claude's prose can name competitors

@@ -173,5 +173,54 @@ class SecretRedactionTests(unittest.TestCase):
             self.assertNotIn("DEMOKEY0EXAMPLE1", f.read())
 
 
+
+class HealthDetailTests(unittest.TestCase):
+    def test_claude_login_error_stops_the_run_early_and_is_reported(self):
+        from src import intelligence
+        from src.models import MacroContext
+        intelligence.LAST_ERROR.update(text="", fatal=False)
+        opps = [Opportunity(ticker=f"T{i}", name=f"T{i}", price=10.0, data_ok=True, rank_score=50 - i) for i in range(8)]
+        calls = []
+
+        def fail(*a, **k):
+            calls.append(1)
+            raise RuntimeError("claude exited 1: Invalid API key · Please run /login")
+        with mock.patch.object(intelligence, "_call", side_effect=fail), \
+             mock.patch.object(intelligence, "ai_available", return_value=True), \
+             mock.patch.object(config, "AI_PARALLEL", 1), mock.patch.object(config, "BATCH_SIZE", 4):
+            intelligence.analyze_tickers(opps, MacroContext())
+        self.assertEqual(len(calls), 1)                     # no retries, no further batches
+        self.assertTrue(intelligence.LAST_ERROR["fatal"])
+        self.assertIn("/login", intelligence.LAST_ERROR["text"])
+        intelligence.LAST_ERROR.update(text="", fatal=False)
+
+    def test_gate_names_the_unusable_holding(self):
+        from src import data_quality
+        good = Opportunity(ticker="AAA", price=10.0)
+        bad = Opportunity(ticker="LOGC", price=0.0)
+        with mock.patch.object(data_quality, "check_ticker",
+                               side_effect=lambda o, now: [] if o.ticker == "AAA" else [next(iter(data_quality.CRITICAL))]):
+            health = data_quality.apply_gate([good, bad], ["LOGC"])
+        status, detail = health.sources["Data-quality gate"]
+        self.assertEqual(status, "failed")
+        self.assertIn("LOGC (", detail)
+        self.assertIn("Holding affected: LOGC", detail)
+
+
+    def test_held_etc_in_usd_on_london_passes(self):
+        from datetime import datetime, timezone
+        from src import data_quality
+        from src.models import PortfolioHolding
+        now = datetime(2026, 10, 28, 12, tzinfo=timezone.utc)
+        gold = Opportunity(ticker="PHAU.L", price=376.0, currency="USD", quote_type="EQUITY", mcap=0.0,
+                           price_time="2026-10-28 11:00 UTC", hist_prices=[1.0] * 300, financial_currency="USD",
+                           portfolio=PortfolioHolding(ticker="PHAU.L", bep_currency="USD", asset_type="ETC"))
+        flags = data_quality.check_ticker(gold, now)
+        self.assertNotIn("no market cap", flags)
+        self.assertNotIn("wrong listing", flags)
+        gold.portfolio = None                                   # not held: a USD quote on .L is still suspicious
+        self.assertIn("wrong listing", data_quality.check_ticker(gold, now))
+
+
 if __name__ == "__main__":
     unittest.main()

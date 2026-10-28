@@ -63,7 +63,8 @@ def check_ticker(opp: Opportunity, now: datetime) -> list[str]:
         flags.append("no quote time")
     if len(opp.hist_prices) < 60:
         flags.append("short history")
-    if opp.quote_type != "ETF" and not opp.mcap:
+    fund = opp.quote_type == "ETF" or (opp.portfolio is not None and opp.portfolio.asset_type in ("ETF", "ETC"))
+    if not fund and not opp.mcap:          # ETFs / ETCs have no market cap (Yahoo calls some ETCs "EQUITY")
         flags.append("no market cap")
     if not opp.financial_currency:
         flags.append("no statement currency")
@@ -72,7 +73,8 @@ def check_ticker(opp: Opportunity, now: datetime) -> list[str]:
     if opp.price_check == "Mismatch":
         flags.append("price mismatch")
     expected = config.SUFFIX_CURRENCY.get(suffix_of(opp.ticker))
-    if expected and opp.currency != expected:
+    held_line = opp.portfolio is not None and opp.currency == (opp.portfolio.bep_currency or "").upper()
+    if expected and opp.currency != expected and not held_line:   # e.g. PHAU.L: the USD line on London you hold
         flags.append("wrong listing")
     if opp.avg_volume is not None and opp.avg_volume * opp.price < config.MIN_DAILY_VALUE_TRADED:
         flags.append("low liquidity")
@@ -99,6 +101,9 @@ def apply_gate(opportunities: list[Opportunity], held_tickers: list[str],
         HEALTH.degraded_reasons.append(f"{share:.0%} of tickers failed the data check "
                                        f"(limit {config.MAX_FAILED_SHARE:.0%})")
     HEALTH.degraded = bool(HEALTH.degraded_reasons)
+    why = "; ".join(f"{o.ticker} ({', '.join(f for f in o.data_flags if f in CRITICAL)})" for o in failed[:6])
     HEALTH.record("Data-quality gate", "failed" if HEALTH.degraded else "ok",
-                  f"{len(opportunities) - len(failed)}/{len(opportunities)} tickers usable")
+                  f"{len(opportunities) - len(failed)}/{len(opportunities)} tickers usable"
+                  + (f" — not usable: {why}" if why else "")
+                  + (f". Holding affected: {', '.join(missing_held)}" if missing_held else ""))
     return HEALTH
