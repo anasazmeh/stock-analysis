@@ -31,9 +31,9 @@ SEC_USER_AGENT        = os.environ.get("SEC_USER_AGENT", "stock-analysis researc
 # "api": paid Anthropic API (needs ANTHROPIC_API_KEY). "off": no AI analysis.
 AI_BACKEND         = os.environ.get("AI_BACKEND", "claude-cli")
 CLAUDE_CLI         = "claude"
-CLAUDE_CLI_MODEL   = "opus"      # alias passed to `claude --model` (opus / sonnet / fable)
+CLAUDE_CLI_MODEL   = "claude-opus-5-5"   # passed to `claude --model`; a pinned ID (an alias like "opus" follows new releases)
 CLAUDE_CLI_TIMEOUT = 600         # seconds per call
-AI_MAX_TICKERS     = 40          # holdings first, then highest-ranked — keeps subscription usage modest
+AI_MAX_TICKERS     = 60          # holdings first, then highest-ranked — lower it if your plan hits usage limits
 CLAUDE_MODEL  = "claude-opus-5-5"   # api backend only
 CLAUDE_EFFORT = "high"              # api backend only
 BATCH_SIZE    = 4        # tickers per Claude API call (failed batches retry one by one)
