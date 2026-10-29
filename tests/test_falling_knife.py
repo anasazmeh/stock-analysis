@@ -33,7 +33,8 @@ class KnifeTests(unittest.TestCase):
         k = falling_knife.check(se_like())
         self.assertIsNotNone(k)
         self.assertEqual(k["return_1m_pct"], -24.5)
-        self.assertIn("Earnings 2026-11-10", k["wait_for"])
+        self.assertIn("results 2026-11-10", k["wait_for"])
+        self.assertIn("26% below", k["text"])
         self.assertIn("101.59", k["wait_for"])
 
     def test_no_flag_for_mild_dip_or_above_ma50(self):

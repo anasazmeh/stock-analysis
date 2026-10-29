@@ -39,11 +39,11 @@ def check(opp: Opportunity) -> Optional[dict]:
              "ma50": round(opp.ma50, 2), "below_ma200": bool(opp.ma200 and opp.price < opp.ma200)}
     when = []
     if opp.next_event and opp.days_to_event is not None and opp.days_to_event <= 45:
-        when.append(f"after {opp.next_event}")
-    when.append(f"a close above the 50-day average ({opp.ma50:,.2f} {opp.currency})")
-    knife["wait_for"] = " or ".join(when)
-    knife["text"] = (f"Falling knife: {ret_1m:+.0f}% in a month, {below_ma50:.0f}% below its 50-day average — "
-                     f"analyst targets likely predate the drop. Wait for {knife['wait_for']}.")
+        when.append(f"after the {opp.next_event.lower().replace('earnings', 'results')}")
+    when.append(f"it closes above its 50-day average ({opp.ma50:,.2f} {opp.currency})")
+    knife["wait_for"] = "until " + " or until ".join(when)
+    knife["text"] = (f"Falling knife: {ret_1m:+.0f}% in a month, {abs(below_ma50):.0f}% below its 50-day average — "
+                     f"analyst targets likely predate the drop. Wait {knife['wait_for']}.")
     return knife
 
 

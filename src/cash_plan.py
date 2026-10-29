@@ -183,8 +183,8 @@ def eligible_ideas(opportunities: list[Opportunity], sold: set, sectors: dict, f
             why_not.append("in a downtrend")
         if o.falling_knife:
             k = o.falling_knife
-            why_not.append(f"falling knife ({k['return_1m_pct']:+.0f}% in a month, {k['below_ma50_pct']:.0f}% below "
-                           f"its 50-day average) — wait for {k['wait_for']}")
+            why_not.append(f"falling knife ({k['return_1m_pct']:+.0f}% in a month, {abs(k['below_ma50_pct']):.0f}% below "
+                           f"its 50-day average) — wait {k['wait_for']}")
         if o.portfolio and (o.sell_review or {}).get("category") not in (None, "Hold", "Shariah review"):
             why_not.append(f"Sell review says {o.sell_review['category'].lower()}")
         if config.REINVEST_SHARIAH_ONLY and (not o.shariah or o.shariah.compliant != "Yes"):
