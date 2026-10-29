@@ -228,7 +228,8 @@ class ModelChoiceTests(unittest.TestCase):
         from src import intelligence
         self.assertEqual(config.CLAUDE_CLI_MODEL, "opus")
         for m in ("fable", "best", "claude-fable-5-1", "FABLE"):
-            with mock.patch.object(config, "CLAUDE_CLI_MODEL", m):
+            with mock.patch.object(config, "CLAUDE_CLI_MODEL", m), \
+                 mock.patch.object(config, "AI_BACKEND", "claude-cli"):   # CI runs with AI_BACKEND=off
                 self.assertTrue(intelligence._credit_model(), m)
                 self.assertIn("usage credits", intelligence.ai_unavailable_reason())
         for m in ("opus", "sonnet", "claude-opus-5-5"):
