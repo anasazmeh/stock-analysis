@@ -203,7 +203,7 @@ def validate(raw: dict, packs: dict) -> dict:
 
 
 # Why the last Claude call failed (shown in Data Health), and whether to stop trying this run
-LAST_ERROR = {"text": "", "fatal": False}
+LAST_ERROR = {"text": "", "fatal": False, "sent": 0}   # sent = tickers handed to Claude this run
 _FATAL = ("/login", "log in", "logged in", "not authenticated", "authentication", "usage limit", "limit reached",
           "limit will reset", "rate limit", "credit balance", "expired", "unauthorized", "401", "403")
 
@@ -321,6 +321,7 @@ def analyze_tickers(opportunities: list[Opportunity], macro: MacroContext) -> tu
     usable = [o for o in opportunities if o.price > 0 and o.data_ok]
     usable.sort(key=lambda o: (0 if o.portfolio else 1, -(o.rank_score or 0)))
     eligible = usable[:config.AI_MAX_TICKERS]
+    LAST_ERROR["sent"] = len(eligible)
     skipped = len([o for o in opportunities if o.price > 0]) - len(usable)
     if skipped:
         print(f"  [intelligence] {skipped} tickers skipped (failed data-quality gate)")

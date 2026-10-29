@@ -229,8 +229,11 @@ def main() -> int:
         opportunities, prompt_digest = analyze_tickers(opportunities, macro)
         n = sum(o.analysis is not None for o in opportunities)
         from src.intelligence import LAST_ERROR
-        HEALTH.record("Claude analysis", _status(n, sum(o.data_ok for o in priced)), f"{n} tickers"
-                      + (f" — last error: {LAST_ERROR['text']}" if LAST_ERROR["text"] and n < sum(o.data_ok for o in priced) else ""))
+        # Only the top AI_MAX_TICKERS are sent on purpose; judge the stage on those
+        sent = LAST_ERROR.get("sent") or sum(o.data_ok for o in priced)
+        HEALTH.record("Claude analysis", _status(n, sent), f"{n} of {sent} tickers sent"
+                      + (f" (top {config.AI_MAX_TICKERS} by rank)" if sent == config.AI_MAX_TICKERS else "")
+                      + (f" — last error: {LAST_ERROR['text']}" if LAST_ERROR["text"] and n < sent else ""))
     else:
         HEALTH.record("Claude analysis", "skipped", "--no-ai, AI_BACKEND=off, or `claude` not installed")
     scrub_inputs(opportunities, macro)   # Claude's prose can name competitors
