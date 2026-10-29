@@ -41,13 +41,13 @@ HOLDINGS = [
 # limit and currency as shown in the order; GTC = good till cancelled. Checked every run on the Sell review tab.
 OPEN_ORDERS = [
     {"ticker": "TSM",  "side": "Sell", "qty": 10, "limit": 490.00,  "currency": "USD", "validity": "GTC", "placed": "2026-10-18"},
-    {"ticker": "AVGO", "side": "Sell", "qty": 4,  "limit": 350.00,  "currency": "USD", "validity": "GTC", "placed": "2026-10-18"},
+    {"ticker": "AVGO", "side": "Sell", "qty": 4,  "limit": 400.00,  "currency": "USD", "validity": "GTC", "placed": "2026-10-18"},
     {"ticker": "CRDO", "side": "Sell", "qty": 6,  "limit": 210.00,  "currency": "USD", "validity": "GTC", "placed": "2026-10-18"},
     {"ticker": "NVDA", "side": "Sell", "qty": 10, "limit": 240.00,  "currency": "USD", "validity": "GTC", "placed": "2026-10-18"},
     {"ticker": "MSFT", "side": "Sell", "qty": 6,  "limit": 560.00,  "currency": "USD", "validity": "GTC", "placed": "2026-10-18"},
     {"ticker": "AMZN", "side": "Sell", "qty": 10, "limit": 280.00,  "currency": "USD", "validity": "GTC", "placed": "2026-10-18"},
-    {"ticker": "ASML.AS", "side": "Sell", "qty": 1,  "limit": 1720.00, "currency": "EUR", "validity": "GTC", "placed": "2026-10-19"},
-    {"ticker": "TEM",  "side": "Sell", "qty": 10, "limit": 69.00,   "currency": "EUR", "validity": "GTC", "placed": "2026-10-19"},
+    {"ticker": "ASML.AS", "side": "Sell", "qty": 1,  "limit": 1716.00, "currency": "EUR", "validity": "GTC", "placed": "2026-10-26"},
+    {"ticker": "TEM",  "side": "Sell", "qty": 10, "limit": 75.00,   "currency": "EUR", "validity": "GTC", "placed": "2026-10-19"},
     {"ticker": "SAP.DE", "side": "Sell", "qty": 10, "limit": 240.40,  "currency": "EUR", "validity": "GTC", "placed": "2026-10-19"},
 ]
 
