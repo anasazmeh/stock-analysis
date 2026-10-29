@@ -141,6 +141,8 @@ def evidence_pack(opp: Opportunity) -> dict:
         add("shariah_reasons", opp.shariah.reasons, "computed")
     add("insider_signal_30d", opp.insider_signal if opp.insider_signal not in ("Neutral", "") else None,
         "SEC Form 4")
+    add("falling_knife", opp.falling_knife["text"] if opp.falling_knife else None,
+        "computed: 1-month return and 50-day average; analyst targets may predate the drop")
     from src.orders import load_orders
     add("your_open_orders", [f"{o['side']} {o['qty']:g} @ {o['limit']:g} {o.get('currency', '')} ({o.get('validity', 'GTC')})"
                              for o in load_orders() if o["ticker"] == opp.ticker] or None, "your broker (portfolio_data.py)")

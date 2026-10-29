@@ -102,6 +102,9 @@ def check_conditions(opportunities: list[Opportunity], health=None, exposure: di
         # ── New-money signals ──
         can_signal = allow_new_signals and price_ok and opp.tradable != "Watch only" and not is_exit_candidate(opp)
         upside = opp.adj_upside
+        if can_signal and opp.falling_knife and not opp.portfolio:
+            _add(alerts, "WARN", opp.ticker, f"{opp.falling_knife['text']} {_shariah(opp)}")
+            can_signal = False          # no BUY or DIP alert while it's still falling
         if can_signal and upside is not None and upside >= config.ALERT_UPSIDE_MIN:
             if earnings_blackout(opp):
                 _add(alerts, "INFO", opp.ticker, f"Quality-adjusted upside +{upside:.0f}% but {opp.next_event} "
