@@ -399,7 +399,7 @@ MAX_FAILED_SHARE   = 0.20    # run is DEGRADED when more tickers than this fail
 
 # ── Portfolio concentration ───────────────────────────
 POSITION_CAP_PCT = 20.0     # max single position, % of priced portfolio (EUR) — your choice (was 12)
-THEME_CAP_PCT    = 40.0     # max per theme (see "themes" in portfolio_data.py)
+THEME_CAP_PCT    = 50.0     # max per theme (see "themes" in portfolio_data.py) — your choice (was 40)
 TYPICAL_ADD_EUR  = 1000.0   # trade size used for "weight after an ADD" checks
 
 # ── Enrichment ────────────────────────────────────────
