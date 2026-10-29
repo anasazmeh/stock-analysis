@@ -222,5 +222,19 @@ class HealthDetailTests(unittest.TestCase):
         self.assertIn("wrong listing", data_quality.check_ticker(gold, now))
 
 
+
+class ModelChoiceTests(unittest.TestCase):
+    def test_latest_opus_alias_and_no_credit_models(self):
+        from src import intelligence
+        self.assertEqual(config.CLAUDE_CLI_MODEL, "opus")
+        for m in ("fable", "best", "claude-fable-5-1", "FABLE"):
+            with mock.patch.object(config, "CLAUDE_CLI_MODEL", m):
+                self.assertTrue(intelligence._credit_model(), m)
+                self.assertIn("usage credits", intelligence.ai_unavailable_reason())
+        for m in ("opus", "sonnet", "claude-opus-5-5"):
+            with mock.patch.object(config, "CLAUDE_CLI_MODEL", m):
+                self.assertFalse(intelligence._credit_model(), m)
+
+
 if __name__ == "__main__":
     unittest.main()

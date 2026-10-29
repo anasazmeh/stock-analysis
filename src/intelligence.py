@@ -217,16 +217,24 @@ def _note_error(e: Exception):
         LAST_ERROR["fatal"] = True
 
 
+def _credit_model() -> bool:
+    m = (config.CLAUDE_CLI_MODEL or "").lower()
+    return any(m == c or m.startswith(f"claude-{c}") or m.startswith(c + "[") for c in config.CREDIT_MODELS)
+
+
 def ai_available() -> bool:
     """claude-cli: the `claude` command is installed · api: a key is set · off: never."""
     if config.AI_BACKEND == "claude-cli":
-        return shutil.which(config.CLAUDE_CLI) is not None
+        return shutil.which(config.CLAUDE_CLI) is not None and not _credit_model()
     if config.AI_BACKEND == "api":
         return bool(config.ANTHROPIC_API_KEY)
     return False
 
 
 def ai_unavailable_reason() -> str:
+    if config.AI_BACKEND == "claude-cli" and _credit_model():
+        return (f"CLAUDE_CLI_MODEL '{config.CLAUDE_CLI_MODEL}' can bill usage credits — use \"opus\" "
+                "(the latest Opus, included in your plan)")
     if config.AI_BACKEND == "claude-cli":
         return f"`{config.CLAUDE_CLI}` command not found — install Claude Code and log in"
     if config.AI_BACKEND == "api":

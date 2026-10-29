@@ -31,7 +31,10 @@ SEC_USER_AGENT        = os.environ.get("SEC_USER_AGENT", "stock-analysis researc
 # "api": paid Anthropic API (needs ANTHROPIC_API_KEY). "off": no AI analysis.
 AI_BACKEND         = os.environ.get("AI_BACKEND", "claude-cli")
 CLAUDE_CLI         = "claude"
-CLAUDE_CLI_MODEL   = "claude-opus-5-5"   # passed to `claude --model`; a pinned ID (an alias like "opus" follows new releases)
+# "opus" = the latest Opus, included in your Claude plan's limits and updated automatically when a newer Opus
+# ships. Not "fable" / "best": depending on the plan they bill to usage credits (see `/model` in claude).
+CLAUDE_CLI_MODEL   = "opus"
+CREDIT_MODELS      = ("fable", "best")   # refused for CLAUDE_CLI_MODEL — the analysis must stay free
 CLAUDE_CLI_TIMEOUT = 600         # seconds per call
 AI_MAX_TICKERS     = 60          # holdings first, then highest-ranked — lower it if your plan hits usage limits
 CLAUDE_MODEL  = "claude-opus-5-5"   # api backend only
