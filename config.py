@@ -31,9 +31,12 @@ SEC_USER_AGENT        = os.environ.get("SEC_USER_AGENT", "stock-analysis researc
 # "api": paid Anthropic API (needs ANTHROPIC_API_KEY). "off": no AI analysis.
 AI_BACKEND         = os.environ.get("AI_BACKEND", "claude-cli")
 CLAUDE_CLI         = "claude"
-CLAUDE_CLI_MODEL   = "opus"      # alias passed to `claude --model` (opus / sonnet / fable)
+# "opus" = the latest Opus, included in your Claude plan's limits and updated automatically when a newer Opus
+# ships. Not "fable" / "best": depending on the plan they bill to usage credits (see `/model` in claude).
+CLAUDE_CLI_MODEL   = "opus"
+CREDIT_MODELS      = ("fable", "best")   # refused for CLAUDE_CLI_MODEL — the analysis must stay free
 CLAUDE_CLI_TIMEOUT = 600         # seconds per call
-AI_MAX_TICKERS     = 40          # holdings first, then highest-ranked — keeps subscription usage modest
+AI_MAX_TICKERS     = 60          # holdings first, then highest-ranked — lower it if your plan hits usage limits
 CLAUDE_MODEL  = "claude-opus-5-5"   # api backend only
 CLAUDE_EFFORT = "high"              # api backend only
 BATCH_SIZE    = 4        # tickers per Claude API call (failed batches retry one by one)
@@ -303,6 +306,10 @@ REINVEST_MAX_IDEAS   = 5        # new money goes to at most this many of the Top
 REINVEST_MAX_SHARE   = 0.40     # no single idea gets more than this share of the money invested
 REINVEST_MIN_TICKET  = 250.0    # EUR — smaller buys cost too much in fees
 REINVEST_MIN_UPSIDE  = 30.0 if PROFILE_ON else 15.0   # % quality-adjusted upside an idea needs without a Claude BUY
+# Falling-knife guard (src/falling_knife.py): a stock down this much in a month AND below its 50-day
+# average counts its analyst upside at KNIFE_UPSIDE_FACTOR and isn't bought until it stabilises.
+KNIFE_1M_DROP_PCT    = -15.0
+KNIFE_UPSIDE_FACTOR  = 0.5
 REINVEST_SHARIAH_ONLY = False   # True = only Shariah "Yes" ideas get new money (label stays visible either way)
 SECTOR_SOFT_CAP_PCT  = 35.0     # buys in sectors already above this share carry a concentration note
 # Money no Top 10 idea can take: "auto" decides from the market and the candidates (keep ready for

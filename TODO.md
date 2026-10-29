@@ -45,7 +45,7 @@ Run `bash scripts/setup.sh` — it installs the packages, checks Claude Code, an
 The Claude stage runs through your logged-in Claude Code (`claude -p`), so it uses your Claude
 subscription instead of a paid API key. Install Claude Code, run `claude` once and log in — that's it.
 Settings in `config.py`: `AI_BACKEND` ("claude-cli" / "api" / "off"), `CLAUDE_CLI_MODEL`
-("opus" / "sonnet"), `AI_MAX_TICKERS` (holdings first; lower it to use less of your plan's limits).
+("opus" = the latest Opus, included in your plan; "fable"/"best" are refused because they can bill usage credits), `AI_MAX_TICKERS` (60; holdings first; lower it to use less of your plan's limits).
 
 ### 1. Get Free API Keys
 Four keys unlock features already coded in the pipeline:

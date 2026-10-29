@@ -36,6 +36,7 @@
     {% else %}<p class="muted">No price history this run.</p>{% endif %}
     <dl class="kv" style="margin-top:12px">
       <dt>Trend</dt><dd>{{ trend(o.trend) }} · 50d {{ o.ma50 | num }} · 200d {{ o.ma200 | num }}</dd>
+      {% if o.falling_knife %}<dt>Falling knife</dt><dd><span class="chip bad">on</span> {{ o.falling_knife.text }}{% if o.falling_knife.upside_before is defined %} Upside counted at half: {{ o.falling_knife.upside_before | num(0) }}% → {{ o.adj_upside | num(0) }}%.{% endif %}</dd>{% endif %}
       {% for k, v in o.rel_strength.items() %}<dt>6m vs {{ k }}</dt><dd>{{ pl(v) | replace('%', ' pts') }}</dd>{% endfor %}
       {% if o.rev_growth is not none or o.eps_growth is not none %}<dt>Growth (yearly)</dt><dd>revenue {{ o.rev_growth | pct }} · earnings {{ o.eps_growth | pct }}</dd>{% endif %}
       <dt>Next event</dt><dd>{{ o.next_event or '–' }}{% if o.days_to_event is not none %} ({{ o.days_to_event }} trading days){% endif %}</dd>

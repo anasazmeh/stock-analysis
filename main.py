@@ -206,6 +206,8 @@ def main() -> int:
     # ── 6. Risk, trend, regulatory watch, exposure, theses, events ───────
     print("⚠️  Stage 6: Risk, trend, exposure, events...")
     opportunities = compute_risk(opportunities, benchmarks)
+    from src.falling_knife import apply as apply_falling_knife
+    opportunities = apply_falling_knife(opportunities)   # after the trend, before ranking and Claude
     opportunities = apply_exit_metrics(opportunities)   # trailing stop etc., before the Claude stage
     macro = apply_geo_watch(opportunities, macro)
     from src.geo_watch import STATUS as GEO_STATUS

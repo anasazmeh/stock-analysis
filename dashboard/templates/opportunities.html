@@ -62,7 +62,7 @@
           <td class="num" data-value="{{ o.upside if o.upside is not none else '' }}">{{ pl(o.upside) }}</td>
           <td class="num" data-value="{{ o.adj_upside if o.adj_upside is not none else '' }}">{{ pl(o.adj_upside) }}</td>
           <td class="num" data-value="{{ o.analyst_count or '' }}">{{ o.analyst_count or '–' }}{% if o.consensus_quality and o.consensus_quality not in ('Good', 'None') %} <span class="chip warn">{{ o.consensus_quality }}</span>{% endif %}</td>
-          <td>{{ trend(o.trend) }}</td>
+          <td>{{ trend(o.trend) }}{% if o.falling_knife %} <span class="chip bad" title="{{ o.falling_knife.text }}">falling knife</span>{% endif %}</td>
           <td class="num" data-value="{{ (o.risk or {}).get('composite_score') or '' }}">{{ (o.risk or {}).get('composite_score') | num(1) }}</td>
           <td>{{ shariah(o.shariah) }}</td>
           <td>{% if o.analysis and o.analysis.status == 'OK' %}{{ o.analysis.new_buyer_action }}{% else %}<span class="muted">–</span>{% endif %}</td>

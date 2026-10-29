@@ -39,6 +39,7 @@ def opportunity_row(opp: Opportunity, top10: set) -> dict:
         "shariah": _asdict(opp.shariah), "risk": _asdict(opp.risk), "analysis": _asdict(opp.analysis),
         "portfolio": _asdict(opp.portfolio),
         "trend": opp.trend, "ma50": opp.ma50, "ma200": opp.ma200, "rel_strength": opp.rel_strength,
+        "falling_knife": opp.falling_knife,
         "next_event": opp.next_event, "days_to_event": opp.days_to_event,
         "insider_signal": opp.insider_signal, "insider_net_shares": opp.insider_net_shares,
         "insider_planned_shares": opp.insider_planned_shares,

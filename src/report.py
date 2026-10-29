@@ -214,6 +214,8 @@ def _card(lines, i, opp: Opportunity):
     lines.append(f"| **Analyst target / upside** | {target} / {_upside_emoji(opp.upside)} — "
                  f"{opp.analyst_count or '?'} analysts, consensus {opp.consensus_quality or 'N/A'}, "
                  f"quality-adjusted {_pct(opp.adj_upside)} ({opp.target_source or 'n/a'}) |")
+    if opp.falling_knife:
+        lines.append(f"| **⚠️ Falling knife** | {opp.falling_knife['text']} |")
     rc = opp.rating_changes_90d
     if rc:
         lines.append(f"| **Rating changes (90d)** | ⬆️ {rc.get('up', 0)} · ⬇️ {rc.get('down', 0)} |")
